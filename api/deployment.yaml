@@ -1,0 +1,120 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: localhost:5000/api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: NODE_ENV
+              value: "development"
+            - name: PORT
+              value: "8000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: api-secret
+                  key: jwt-secret
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: api-config
+              mountPath: /app/config
+      volumes:
+        - name: api-config
+          configMap:
+            name: api-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+data:
+  app.config.json: |
+    {
+      "appName": "api",
+      "version": "1.0.0",
+      "logging": {
+        "level": "info",
+        "format": "json"
+      },
+      "server": {
+        "port": 8000,
+        "host": "0.0.0.0"
+      },
+      "database": {
+        "connectionTimeout": 5000,
+        "idleTimeout": 30000
+      },
+      "cache": {
+        "ttl": 3600,
+        "maxSize": 1000
+      },
+      "security": {
+        "jwt": {
+          "secret": "jwt-secret",
+          "expiresIn": "24h"
+        }
+      }
+    }
+  env.config.js: |
+    module.exports = {
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      PORT: process.env.PORT || 8000,
+      JWT_SECRET: process.env.JWT_SECRET || 'jwt-secret',
+      LOG_LEVEL: process.env.LOG_LEVEL || 'info'
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-secret
+type: Opaque
+data:
+  jwt-secret: U3VwZXJTZWNyZXRLZXlIZXJlCg==
