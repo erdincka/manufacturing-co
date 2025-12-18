@@ -1,262 +1,259 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Machine, ProductionLog, DashboardStats, InventoryItem } from './interfaces';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { DashboardData, ScenarioResult, BootstrapResult } from './interfaces';
+import { StatusItem, ResourceStat } from './components/DashboardComponents';
 
-// --- Components ---
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const colors = {
-    running: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-    idle: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-    maintenance: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    error: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
-  };
-
-  return (
-    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${colors[status as keyof typeof colors] || 'bg-gray-500/10 text-gray-500'}`}>
-      {status.toUpperCase()}
-    </span>
-  );
-};
-
-const HealthBar = ({ score }: { score: number }) => {
-  let color = 'bg-emerald-500';
-  if (score < 70) color = 'bg-amber-500';
-  if (score < 40) color = 'bg-rose-500';
-
-  return (
-    <div className="w-full bg-zinc-800 rounded-full h-1.5 mt-2">
-      <div className={`h-1.5 rounded-full transition-all duration-500 ${color}`} style={{ width: `${score}%` }}></div>
-    </div>
-  );
-};
-
-const MachineCard = ({ machine }: { machine: Machine }) => (
-  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 hover:border-zinc-700 transition-colors">
-    <div className="flex justify-between items-start mb-4">
-      <div>
-        <h3 className="text-zinc-100 font-semibold text-lg">{machine.name}</h3>
-        <p className="text-zinc-400 text-sm">{machine.type}</p>
-      </div>
-      <StatusBadge status={machine.status} />
-    </div>
-
-    <div className="grid grid-cols-2 gap-4 mb-4">
-      <div>
-        <p className="text-zinc-500 text-xs uppercase tracking-wider">Temp</p>
-        <p className="text-zinc-200 font-mono">{machine.temperature.toFixed(1)}°C</p>
-      </div>
-      <div>
-        <p className="text-zinc-500 text-xs uppercase tracking-wider">Vibration</p>
-        <p className="text-zinc-200 font-mono">{machine.vibration.toFixed(3)}g</p>
-      </div>
-    </div>
-
-    <div>
-      <div className="flex justify-between text-xs mb-1">
-        <span className="text-zinc-500">Health Score</span>
-        <span className="text-zinc-300">{machine.health_score}%</span>
-      </div>
-      <HealthBar score={machine.health_score} />
-    </div>
-  </div>
-);
-
-const StatCard = ({ title, value, subtext, trend }: { title: string, value: string, subtext?: string, trend?: 'up' | 'down' | 'neutral' }) => (
-  <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-    <p className="text-zinc-500 text-sm font-medium uppercase tracking-wide mb-1">{title}</p>
-    <h2 className="text-3xl font-bold text-white mb-1">{value}</h2>
-    {subtext && <p className="text-zinc-400 text-sm">{subtext}</p>}
-  </div>
-);
-
-const InventoryRow = ({ item }: { item: InventoryItem }) => (
-  <tr className="hover:bg-zinc-800/50 transition-colors border-b border-zinc-800 last:border-0">
-    <td className="px-4 py-3">
-      <div className="font-medium text-zinc-200">{item.product_name}</div>
-      <div className="text-xs text-zinc-500">{item.sku}</div>
-    </td>
-    <td className="px-4 py-3 text-zinc-400">{item.warehouse_location}</td>
-    <td className="px-4 py-3 text-right">
-      <span className={`font-mono ${item.quantity < 100 ? 'text-amber-500 font-bold' : 'text-zinc-300'}`}>
-        {item.quantity}
-      </span>
-    </td>
-    <td className="px-4 py-3 text-right">
-      <div className={`w-2 h-2 rounded-full inline-block ${item.quantity < 100 ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
-    </td>
-  </tr>
-);
-
-// --- Main Page ---
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function Dashboard() {
-  const [machines, setMachines] = useState<Machine[]>([]);
-  const [recentLogs, setRecentLogs] = useState<ProductionLog[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const [actionLogs, setActionLogs] = useState<string[]>([]);
 
-  const fetchData = async () => {
-    try {
-      const [machinesRes, logsRes, statsRes, inventoryRes] = await Promise.all([
-        fetch('http://localhost:8000/machines'),
-        fetch('http://localhost:8000/production/recent'),
-        fetch('http://localhost:8000/dashboard/stats'),
-        fetch('http://localhost:8000/inventory')
-      ]);
+    // Queries
+    const { data: dashboardData, isLoading, isError } = useQuery<DashboardData>({
+        queryKey: ['dashboardData'],
+        queryFn: async () => {
+            const res = await fetch(`${API_BASE}/dashboard/data`);
+            if (!res.ok) throw new Error('Failed to fetch dashboard data');
+            return res.json();
+        },
+        refetchInterval: 10000, // Background refresh every 10s
+    });
 
-      if (machinesRes.ok) setMachines(await machinesRes.json());
-      if (logsRes.ok) setRecentLogs(await logsRes.json());
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (inventoryRes.ok) setInventory(await inventoryRes.json());
-    } catch (error) {
-      console.error("Failed to fetch data", error);
-    } finally {
-      setLoading(false);
+    // Mutations
+    const discoverMutation = useMutation({
+        mutationFn: async () => {
+            await fetch(`${API_BASE}/profile/services`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+        },
+    });
+
+    const bootstrapMutation = useMutation({
+        mutationFn: async () => {
+            setActionLogs(["Starting bootstrap..."]);
+            const res = await fetch(`${API_BASE}/profile/bootstrap`, { method: 'POST' });
+            if (!res.ok) throw new Error('Bootstrap failed');
+            return res.json() as Promise<BootstrapResult>;
+        },
+        onSuccess: (data) => {
+            setActionLogs(data.logs || ["Bootstrap completed"]);
+            queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+        },
+        onError: () => {
+            setActionLogs(prev => [...prev, "✕ Bootstrap failed"]);
+        }
+    });
+
+    const scenarioMutation = useMutation({
+        mutationFn: async ({ type, label }: { type: string, label: string }) => {
+            setActionLogs([`Starting ${label}...`]);
+            const res = await fetch(`${API_BASE}/profile/scenarios/run`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile_id: 'default', scenario_type: type })
+            });
+            if (!res.ok) throw new Error('Scenario failed');
+            return res.json() as Promise<ScenarioResult>;
+        },
+        onSuccess: (data) => {
+            setActionLogs(data.logs?.length ? data.logs : [data.message]);
+            queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+        },
+        onError: () => {
+            setActionLogs(prev => [...prev, "✕ Scenario execution error"]);
+        }
+    });
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+                    <p>Loading Dashboard...</p>
+                </div>
+            </div>
+        );
     }
-  };
 
-  useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 5000); // Poll every 5s
-    return () => clearInterval(interval);
-  }, []);
+    const isConfigured = dashboardData?.configured || false;
+    const readiness = dashboardData?.readiness || {
+        bronze: { status: 'missing', details: {} },
+        silver: { status: 'missing', details: {} },
+        gold: { status: 'missing', details: {} }
+    };
 
-  if (loading) {
-    return <div className="min-h-screen bg-black flex items-center justify-center text-zinc-500">Loading Portal...</div>;
-  }
+    const isReady = readiness.bronze.status === 'ready' &&
+        readiness.silver.status === 'ready' &&
+        readiness.gold.status === 'ready';
 
-  // Calculate derived stats
-  const activeMachines = machines.filter(m => m.status === 'running').length;
-  const totalMachines = machines.length;
-  const utilization = totalMachines > 0 ? Math.round((activeMachines / totalMachines) * 100) : 0;
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    Data Pipeline Dashboard
+                </h2>
+                <div className="flex space-x-4">
+                    {isConfigured && (
+                        <button
+                            onClick={() => discoverMutation.mutate()}
+                            disabled={discoverMutation.isPending}
+                            className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded text-sm transition-colors border border-border"
+                        >
+                            {discoverMutation.isPending ? 'Refreshing...' : 'Refresh Status'}
+                        </button>
+                    )}
+                </div>
+            </div>
 
-  return (
-    <div className="min-h-screen bg-black text-zinc-100 p-8 font-sans">
-      <header className="mb-10 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-            Manufacturing Company
-          </h1>
-          <p className="text-zinc-500 mt-1">Plant Operations Center • Zone A</p>
+            {!isConfigured && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex justify-between items-center">
+                    <span className="text-amber-400">Connection not configured.</span>
+                    <Link href="/settings" className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg">
+                        Configure
+                    </Link>
+                </div>
+            )}
+
+            {isConfigured && !isReady && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-6 text-center">
+                    <h3 className="text-xl font-semibold text-blue-500 mb-2">Demo Resources Missing</h3>
+                    <p className="text-muted-foreground mb-4">
+                        The demo requires specific volumes, topics, and tables to show the end-to-end flow.
+                    </p>
+                    <button
+                        onClick={() => bootstrapMutation.mutate()}
+                        disabled={bootstrapMutation.isPending}
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 transition-all shadow-lg hover:shadow-blue-500/20"
+                    >
+                        {bootstrapMutation.isPending ? (
+                            <span className="flex items-center justify-center">
+                                <span className="animate-spin mr-2">⟳</span> Bootstrapping...
+                            </span>
+                        ) : (
+                            "Bootstrap Demo Resources"
+                        )}
+                    </button>
+                </div>
+            )}
+
+            {/* Main Pipeline Visualization */}
+            {isConfigured && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+                    <div className="hidden md:block absolute top-1/2 left-0 w-full h-px bg-border -z-10 transform -translate-y-1/2"></div>
+
+                    {/* Bronze Layer */}
+                    <div className={`relative bg-card border ${readiness.bronze.status === 'ready' ? 'border-amber-500/50 shadow-lg shadow-amber-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-amber-500/80`}>
+                        <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4 text-2xl border border-amber-500/20">
+                            🥉
+                        </div>
+                        <h3 className="text-lg font-bold text-amber-600 dark:text-amber-500 mb-2">Bronze Layer</h3>
+                        <p className="text-xs text-muted-foreground mb-4">Raw telemetry ingestion</p>
+
+                        <div className="w-full space-y-2 mb-6 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
+                            <StatusItem label="Volume: bronze" active={readiness.bronze.details.volume} />
+                            <StatusItem label="Topic: telemetry.raw" active={readiness.bronze.details.topic} />
+                            <StatusItem label="Bucket: bronze-raw" active={readiness.bronze.details.bucket} />
+                        </div>
+
+                        <div className="mt-auto w-full">
+                            <button
+                                onClick={() => scenarioMutation.mutate({ type: 'simulate_ingestion', label: 'Ingestion' })}
+                                disabled={readiness.bronze.status !== 'ready' || scenarioMutation.isPending}
+                                className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
+                            >
+                                {scenarioMutation.isPending && scenarioMutation.variables?.type === 'simulate_ingestion' ? 'Ingesting...' : 'Ingest Data'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Silver Layer */}
+                    <div className={`relative bg-card border ${readiness.silver.status === 'ready' ? 'border-indigo-500/50 shadow-lg shadow-indigo-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-indigo-500/80`}>
+                        <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4 text-2xl border border-indigo-500/20">
+                            🥈
+                        </div>
+                        <h3 className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-2">Silver Layer</h3>
+                        <p className="text-xs text-muted-foreground mb-4">Cleansed & Enriched</p>
+
+                        <div className="w-full space-y-2 mb-6 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
+                            <StatusItem label="Volume: silver" active={readiness.silver.details.volume} />
+                            <StatusItem label="Table: telemetry.cleansed" active={readiness.silver.details.table} />
+                            <StatusItem label="Bucket: silver-processed" active={readiness.silver.details.bucket} />
+                        </div>
+
+                        <div className="mt-auto w-full">
+                            <button
+                                onClick={() => scenarioMutation.mutate({ type: 'process_data', label: 'Processing' })}
+                                disabled={readiness.silver.status !== 'ready' || scenarioMutation.isPending}
+                                className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
+                            >
+                                {scenarioMutation.isPending && scenarioMutation.variables?.type === 'process_data' ? 'Processing...' : 'Process Data'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Gold Layer */}
+                    <div className={`relative bg-card border ${readiness.gold.status === 'ready' ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-yellow-500/80`}>
+                        <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mb-4 text-2xl border border-yellow-500/20">
+                            🥇
+                        </div>
+                        <h3 className="text-lg font-bold text-yellow-600 dark:text-yellow-400 mb-2">Gold Layer</h3>
+                        <p className="text-xs text-muted-foreground mb-4">Aggregated KPIs</p>
+
+                        <div className="w-full space-y-2 mb-6 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
+                            <StatusItem label="Volume: gold" active={readiness.gold.details.volume} />
+                            <StatusItem label="Table: manufacturing.kpis" active={readiness.gold.details.table} />
+                            <StatusItem label="Bucket: gold-curated" active={readiness.gold.details.bucket} />
+                        </div>
+
+                        <div className="mt-auto w-full">
+                            <button
+                                onClick={() => scenarioMutation.mutate({ type: 'curate_data', label: 'Generating KPIs' })}
+                                disabled={readiness.gold.status !== 'ready' || scenarioMutation.isPending}
+                                className="w-full py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-sm"
+                            >
+                                {scenarioMutation.isPending && scenarioMutation.variables?.type === 'curate_data' ? 'Calculating...' : 'Generate KPIs'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Log Output */}
+            {actionLogs.length > 0 && (
+                <div className="bg-muted/50 border border-border rounded-xl p-4 font-mono text-sm max-h-64 overflow-y-auto shadow-inner">
+                    <div className="flex justify-between items-center mb-3 border-b border-border pb-2">
+                        <span className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Activity Log</span>
+                        <button onClick={() => setActionLogs([])} className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">Clear</button>
+                    </div>
+                    <div className="space-y-1.5">
+                        {actionLogs.map((log, idx) => (
+                            <div key={idx} className={`${log.includes('✕') ? 'text-red-500 dark:text-red-400' :
+                                log.includes('→') ? 'text-muted-foreground' :
+                                    log.includes('✓') ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground/80'
+                                }`}>
+                                {log}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Underlying Resources View */}
+            <div className="pt-8 border-t border-border">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-4">Underlying Resources</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <ResourceStat label="Volumes" count={dashboardData?.volumes?.length || 0} />
+                    <ResourceStat label="Topics" count={dashboardData?.topics?.length || 0} />
+                    <ResourceStat label="Tables" count={dashboardData?.tables?.length || 0} />
+                    <ResourceStat label="Buckets" count={dashboardData?.buckets?.length || 0} />
+                </div>
+            </div>
         </div>
-        <div className="flex items-center gap-4">
-          <Link href="/settings" className="text-sm text-zinc-400 hover:text-white transition-colors">
-            Settings
-          </Link>
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 rounded-full border border-zinc-800">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-            <span className="text-xs font-medium text-zinc-400">System Online</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-        <StatCard
-          title="Plant Utilization"
-          value={`${utilization}%`}
-          subtext={`${activeMachines} / ${totalMachines} Machines Active`}
-        />
-        <StatCard
-          title="24h Production"
-          value={stats?.production_24h?.total_produced?.toLocaleString() || '0'}
-          subtext="Units Produced"
-        />
-        <StatCard
-          title="Defect Rate"
-          value={`${stats?.production_24h?.total_produced ? ((stats.production_24h.total_defects / stats.production_24h.total_produced) * 100).toFixed(2) : 0}%`}
-          subtext={`${stats?.production_24h?.total_defects || 0} Defects Detected`}
-        />
-        <StatCard
-          title="Inventory Alerts"
-          value={stats?.low_stock_count?.toString() || '0'}
-          subtext="Items Low Stock"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Machines */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Machines Grid */}
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-white">Machine Status</h2>
-              <button className="text-sm text-indigo-400 hover:text-indigo-300">View All</button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {machines.map(machine => (
-                <MachineCard key={machine.id} machine={machine} />
-              ))}
-            </div>
-          </div>
-
-          {/* Inventory Section */}
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-white">Warehouse Inventory</h2>
-              <button className="text-sm text-indigo-400 hover:text-indigo-300">Manage Stock</button>
-            </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-zinc-500 uppercase bg-zinc-950/50 border-b border-zinc-800">
-                    <tr>
-                      <th className="px-4 py-3">Product</th>
-                      <th className="px-4 py-3">Location</th>
-                      <th className="px-4 py-3 text-right">Quantity</th>
-                      <th className="px-4 py-3 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
-                    {inventory.slice(0, 5).map(item => (
-                      <InventoryRow key={item.id} item={item} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Recent Activity */}
-        <div>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-white">Recent Production</h2>
-          </div>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-zinc-500 uppercase bg-zinc-950/50 border-b border-zinc-800">
-                  <tr>
-                    <th className="px-4 py-3">Time</th>
-                    <th className="px-4 py-3">Machine</th>
-                    <th className="px-4 py-3 text-right">Qty</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {recentLogs.map(log => (
-                    <tr key={log.id} className="hover:bg-zinc-800/50 transition-colors">
-                      <td className="px-4 py-3 text-zinc-400">
-                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
-                      <td className="px-4 py-3 font-medium text-zinc-200">
-                        {log.machine_name || 'Unknown'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-zinc-300">
-                        {log.quantity_produced}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }

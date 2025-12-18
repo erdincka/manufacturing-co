@@ -1,7 +1,6 @@
 # -*- mode: Python -*-
 
 # Load Kubernetes YAML
-k8s_yaml('db/deployment.yaml')
 k8s_yaml('web/deployment.yaml')
 k8s_yaml('api/deployment.yaml')
 
@@ -51,22 +50,13 @@ k8s_resource(
     labels=['api'],
 )
 
-# DB (MySQL)
-k8s_resource(
-    'mysql',
-    port_forwards='3306:3306',
-    labels=['db'],
-)
-
-
 print("""
 ╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
-║         Manufacturing Demo Co - Tilt Ready.              ║
+║      HPE Data Fabric Manufacturing Demo - Ready         ║
 ║                                                          ║
 ║  Frontend:      http://localhost:3000                    ║
 ║  API:           http://localhost:8000                    ║
-║  Database:      http://localhost:3306                    ║
 ║                                                          ║
 ║  Run: tilt up                                            ║
 ║                                                          ║
