@@ -98,14 +98,33 @@ export default function Dashboard() {
                 <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
                     Data Pipeline Dashboard
                 </h2>
-                <div className="flex space-x-4">
-                    {isConfigured && (
+                <div className="flex items-center space-x-4">
+                    {!isConfigured ? (
+                        <Link href="/settings" className="flex items-center space-x-2 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors shadow-sm">
+                            <span className="text-xs font-bold uppercase tracking-wider">Not Configured</span>
+                            <span>❌</span>
+                        </Link>
+                    ) : !isReady ? (
                         <button
                             onClick={() => discoverMutation.mutate()}
                             disabled={discoverMutation.isPending}
-                            className="px-3 py-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded text-sm transition-colors border border-border"
+                            className="flex items-center space-x-2 px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-colors shadow-sm disabled:opacity-50"
                         >
-                            {discoverMutation.isPending ? 'Refreshing...' : 'Refresh Status'}
+                            <span className="text-xs font-bold uppercase tracking-wider">
+                                {discoverMutation.isPending ? 'Checking...' : 'Resources Missing'}
+                            </span>
+                            <span className={discoverMutation.isPending ? 'animate-spin' : ''}>⚠️</span>
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => discoverMutation.mutate()}
+                            disabled={discoverMutation.isPending}
+                            className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg hover:bg-emerald-500/20 transition-colors shadow-sm disabled:opacity-50"
+                        >
+                            <span className="text-xs font-bold uppercase tracking-wider">
+                                {discoverMutation.isPending ? 'Refreshing...' : 'System Ready'}
+                            </span>
+                            <span className={discoverMutation.isPending ? 'animate-spin' : ''}>✅</span>
                         </button>
                     )}
                 </div>

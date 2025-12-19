@@ -186,22 +186,6 @@ export default function SettingsPage() {
                 className="w-full bg-background border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1.5">Polaris Credentials</label>
-              <input
-                type="text"
-                value={profile.polaris_credentials || ''}
-                onChange={(e) => {
-                  setProfile({ ...profile, polaris_credentials: e.target.value });
-                  setTestResult(null);
-                }}
-                placeholder="realm: POLARIS root principal credentials: ..."
-                className="w-full bg-background border border-border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground mt-2">
-                Get these from: <code className="text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-1 rounded">/opt/mapr/polaris/polaris-1.0.1/server/config/credentials.txt</code> on your cluster.
-              </p>
-            </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <button
@@ -246,78 +230,80 @@ export default function SettingsPage() {
       </div>
 
       {/* Service Discovery */}
-      {profile.cluster_host && (
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Service Discovery</h2>
-            <button
-              onClick={discoverServices}
-              disabled={discovering}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm disabled:opacity-50 transition-all shadow-md hover:shadow-indigo-500/20"
-            >
-              {discovering ? (
-                <>
-                  <span className="inline-block animate-spin mr-2">⟳</span>
-                  Discovering...
-                </>
-              ) : (
-                'Discover Services'
-              )}
-            </button>
-          </div>
-
-          {readiness && (
-            <div className="mb-6 bg-muted/50 rounded-xl p-4 border border-border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Readiness Score</span>
-                <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{readiness.score}%</span>
-              </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className="bg-indigo-500 h-2 rounded-full transition-all shadow-[0_0_8px_rgba(99,102,241,0.5)]"
-                  style={{ width: `${readiness.score}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                {readiness.available_required} of {readiness.total_required} required services available
-              </p>
+      {
+        profile.cluster_host && (
+          <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Service Discovery</h2>
+              <button
+                onClick={discoverServices}
+                disabled={discovering}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm disabled:opacity-50 transition-all shadow-md hover:shadow-indigo-500/20"
+              >
+                {discovering ? (
+                  <>
+                    <span className="inline-block animate-spin mr-2">⟳</span>
+                    Discovering...
+                  </>
+                ) : (
+                  'Discover Services'
+                )}
+              </button>
             </div>
-          )}
 
-          {discovering && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Discovering services...</p>
-            </div>
-          )}
-
-          {!discovering && services.length > 0 && (
-            <div className="space-y-2">
-              {services.map((service, idx) => (
-                <div key={idx} className="border border-border rounded-lg p-3 hover:bg-accent/5 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-2 h-2 rounded-full ${service.auth_status === 'success' ? 'bg-emerald-500' :
-                        service.tcp_available ? 'bg-amber-500' : 'bg-destructive'
-                        } shadow-[0_0_8px_rgba(0,0,0,0.1)]`} />
-                      <div>
-                        <p className="font-medium">{service.description}</p>
-                        <p className="text-xs text-muted-foreground">Port {service.port} ({service.protocol})</p>
-                      </div>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${service.auth_status === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                      service.tcp_available ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-destructive/10 text-destructive'
-                      }`}>
-                      {service.auth_status === 'success' ? 'Available' :
-                        service.tcp_available ? 'Reachable' : 'Unavailable'}
-                    </span>
-                  </div>
+            {readiness && (
+              <div className="mb-6 bg-muted/50 rounded-xl p-4 border border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Readiness Score</span>
+                  <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{readiness.score}%</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-indigo-500 h-2 rounded-full transition-all shadow-[0_0_8px_rgba(99,102,241,0.5)]"
+                    style={{ width: `${readiness.score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {readiness.available_required} of {readiness.total_required} required services available
+                </p>
+              </div>
+            )}
+
+            {discovering && (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Discovering services...</p>
+              </div>
+            )}
+
+            {!discovering && services.length > 0 && (
+              <div className="space-y-2">
+                {services.map((service, idx) => (
+                  <div key={idx} className="border border-border rounded-lg p-3 hover:bg-accent/5 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${service.auth_status === 'success' ? 'bg-emerald-500' :
+                          service.tcp_available ? 'bg-amber-500' : 'bg-destructive'
+                          } shadow-[0_0_8px_rgba(0,0,0,0.1)]`} />
+                        <div>
+                          <p className="font-medium">{service.description}</p>
+                          <p className="text-xs text-muted-foreground">Port {service.port} ({service.protocol})</p>
+                        </div>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${service.auth_status === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                        service.tcp_available ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-destructive/10 text-destructive'
+                        }`}>
+                        {service.auth_status === 'success' ? 'Available' :
+                          service.tcp_available ? 'Reachable' : 'Unavailable'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      }
 
       {/* SQLite Database Viewer */}
       <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
@@ -389,6 +375,6 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

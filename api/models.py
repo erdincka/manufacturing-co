@@ -10,7 +10,6 @@ class ConnectionProfile(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     s3_credentials: Optional[str] = None
-    polaris_credentials: Optional[str] = None
 
 class ConnectionTestResult(BaseModel):
     status: str  # success, error, auth_failed, tls_error

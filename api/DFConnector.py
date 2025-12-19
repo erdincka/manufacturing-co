@@ -58,8 +58,6 @@ class DataFabricConnector:
             desc = svc_info["description"]
             if desc == "Object Store":
                 svc_res = self.s3.test_s3()
-            elif desc == "Polaris Catalogue":
-                svc_res = self.iceberg.test_iceberg()
             else:
                 svc_res = self.base._test_port_service(svc_info["port"], desc)
             

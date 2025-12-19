@@ -38,11 +38,13 @@ logging.basicConfig(
 # Disable detailed logs for noisy libraries
 for noise_logger in [
     "kafka.conn", "kafka.metrics", "kafka.protocol", "kafka.client", 
-    "kafka.cluster", "kafka.admin.client", "urllib3", "botocore", "uvicorn.error", "uvicorn.access"
+    "kafka.cluster", "kafka.admin.client", "urllib3", "botocore", "uvicorn.error", "uvicorn.access", "pyiceberg.io", "asyncio",
+    "s3fs", "aiobotocore.regions"
 ]:
     logging.getLogger(noise_logger).setLevel(logging.WARNING)
 
 logging.getLogger("kafka.conn").setLevel(logging.ERROR)
+logging.getLogger("kafka.sasl.plain").setLevel(logging.ERROR)
 
 # Align Uvicorn loggers with our format
 for uvicorn_logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
@@ -122,14 +124,6 @@ def init_db():
         )
     """
     )
-    
-    # Migration: Add polaris_credentials if not exists
-    try:
-        cursor.execute("ALTER TABLE connection_profile ADD COLUMN polaris_credentials TEXT")
-        conn.commit()
-    except Exception:
-        # Column likely exists
-        pass
 
     # Bootstrap state
     cursor.execute(
@@ -223,8 +217,7 @@ def update_profile(profile: ConnectionProfile):
                 UPDATE connection_profile 
                 SET name = ?, cluster_host = ?,
                     username = ?, password = ?,
-                    polaris_credentials = ?,
-                     updated_at = ?, configured = 1
+                    updated_at = ?, configured = 1
                 WHERE id = 'default'
             """,
                 (
@@ -232,7 +225,6 @@ def update_profile(profile: ConnectionProfile):
                     profile.cluster_host,
                     profile.username,
                     profile.password,
-                    profile.polaris_credentials,
                     now,
                 ),
             )
@@ -241,16 +233,15 @@ def update_profile(profile: ConnectionProfile):
             cursor.execute(
                 """
                 INSERT INTO connection_profile 
-                (id, name, cluster_host, username, password, polaris_credentials,
+                (id, name, cluster_host, username, password,
                  created_at, updated_at, configured)
-                VALUES ('default', ?, ?, ?, ?, ?, ?, ?, 1)
+                VALUES ('default', ?, ?, ?, ?, ?, ?, 1)
             """,
                 (
                     profile.name,
                     profile.cluster_host,
                     profile.username,
                     profile.password,
-                    profile.polaris_credentials,
                     now,
                     now,
                 ),
@@ -612,7 +603,7 @@ def get_dashboard_data():
             "silver": {
                 "volume_name": "silver",
                 "bucket": "silver-processed",
-                "table": "manufacturing.telemetry.cleansed",
+                "table": "telemetry.cleansed",
             },
             "gold": {
                 "volume_name": "gold",
@@ -650,8 +641,9 @@ def get_dashboard_data():
                 if not exists: layer_ready = False
                 
             if "table" in specs:
-                # Check if any listed table ends with the expected name (handling catalog prefixes)
-                exists = any(t.endswith(specs["table"]) for t in table_names)
+                # Use strict match if possible, but allow for catalog prefix
+                target = specs["table"]
+                exists = any(t == target or t.endswith("." + target) for t in table_names)
                 details["table"] = exists
                 if not exists: layer_ready = False
             
@@ -771,7 +763,7 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
                 {"id": 6, "required": True, "name": "status", "type": "string"},
             ]
         },
-        "kpis.hourly_summary": {
+        "manufacturing.kpis": {
             "type": "struct",
             "schema-id": 1,
             "fields": [
@@ -943,12 +935,12 @@ def run_scenario(request: ScenarioRequest):
         time.sleep(1.5)
         
         record_count = 85 # Some filtered out
-        logs.append(f"Writing {record_count} cleansed records to 'manufacturing.telemetry.cleansed'...")
+        logs.append(f"Writing {record_count} cleansed records to 'telemetry.cleansed'...")
         time.sleep(1)
         
         # Simulate update to S3/Iceberg
         logs.append("✓ Committed transaction to Iceberg table")
-        data_generated = {"records_processed": record_count, "target": "manufacturing.telemetry.cleansed"}
+        data_generated = {"records_processed": record_count, "target": "telemetry.cleansed"}
         
         log_demo_event("default", "scenario", "Processing job completed")
 

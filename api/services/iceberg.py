@@ -1,226 +1,143 @@
 import logging
-import json
+import os
 from typing import Dict, Any, List, Optional
-from services.base import BaseDataFabricService
-import requests
+from services.base import BaseDataFabricService, DB_PATH
+from pyiceberg.catalog.sql import SqlCatalog
+from pyiceberg.schema import Schema
+from pyiceberg.types import (
+    TimestampType,
+    FloatType,
+    StringType,
+    NestedField,
+    LongType,
+    IntegerType
+)
+from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 
 logger = logging.getLogger("api.services.iceberg")
 
 class IcebergService(BaseDataFabricService):
     def __init__(self, profile: Dict[str, Any]):
         super().__init__(profile)
-        self.polaris_credentials = profile.get("polaris_credentials")
-        self.headers = self._get_polaris_headers()
+        self.catalog = self._init_catalog()
 
-    CATALOG_NAME = "manufacturing"
+    def _init_catalog(self) -> SqlCatalog:
+        """Initialize the local SQL catalog."""
+        warehouse_path = f"s3://gold-curated/iceberg/"
+        
+        # PyIceberg SQL Catalog configuration
+        catalog_conf = {
+            "uri": f"sqlite:///{DB_PATH}",
+            "warehouse": warehouse_path,
+            "s3.endpoint": f"https://{self.cluster_host}:9000",
+            "s3.access-key-id": self.profile.get("username", "mapr"),
+            "s3.secret-access-key": self.profile.get("password", "mapr"),
+            "s3.verify": "false",
+            "s3.region": "us-east-1",
+            "s3.path-style-access": "true",
+        }
+        
+        # Add S3 credentials if available (for temp key support)
+        s3_creds = self.profile.get("s3_credentials")
+        if s3_creds:
+            import json
+            try:
+                if isinstance(s3_creds, str):
+                    s3_creds = json.loads(s3_creds)
+                catalog_conf["s3.access-key-id"] = s3_creds.get("accessKey")
+                catalog_conf["s3.secret-access-key"] = s3_creds.get("secretKey")
+            except:
+                pass
 
-    def _get_polaris_headers(self) -> Optional[Dict[str, str]]:
-        if not self.polaris_credentials: return None
-        try:
-            creds = self.polaris_credentials.split(" root principal credentials: ")[1]
-            realm = self.polaris_credentials.split(" root principal credentials: ")[0].split(": ")[1]
-            client_id = creds.split(":")[0]
-            client_secret = creds.split(":")[1]
-            if not client_id or not client_secret: return None
-            url = f"https://{self.cluster_host}:8181/api/catalog/v1/oauth/tokens"
-            data = {"grant_type": "client_credentials", "scope": "PRINCIPAL_ROLE:ALL"}
-            resp = self.session.post(url, data=data, auth=(client_id, client_secret), verify=False, timeout=5)
-            if resp.status_code == 200:
-                return {
-                    "Authorization": f"Bearer {resp.json()['access_token']}",
-                    "Accept": "application/json",
-                    "Content-Type": "application/json",
-                    'Polaris-Realm': realm
-                }
-            return None
-        except Exception as e:
-            logger.error(f"Polaris token error: {e}")
-            return None
-
-    def _check_catalog_exists(self) -> bool:
-        """Check if the catalog exists without side effects."""
-        if not self.headers: return False
-        try:
-            url = f"https://{self.cluster_host}:8181/api/management/v1/catalogs/{self.CATALOG_NAME}"
-            resp = requests.get(url, headers=self.headers, verify=False, timeout=5, auth=None)
-            return resp.status_code == 200
-        except Exception:
-            return False
-
-    def _check_namespace_exists(self, namespace: str) -> bool:
-        """Check if the namespace exists without side effects."""
-        if not self.headers: return False
-        try:
-            url = f"https://{self.cluster_host}:8181/api/catalog/v1/{self.CATALOG_NAME}/namespaces/{namespace}"
-            resp = requests.get(url, headers=self.headers, verify=False, timeout=5, auth=None)
-            return resp.status_code == 200
-        except Exception:
-            return False
-
-    def _ensure_catalog_exists(self) -> bool:
-        """Ensure the manufacturing catalog exists, creating it if necessary."""
-        if not self.headers: return False
-        try:
-            # Check if catalog exists
-            url = f"https://{self.cluster_host}:8181/api/management/v1/catalogs/{self.CATALOG_NAME}"
-            resp = requests.get(url, headers=self.headers, verify=False, timeout=5, auth=None)
-            
-            if resp.status_code == 200:
-                # logger.debug("Catalog exists at %s", url)
-                # logger.debug("API Headers: %s", self.headers)
-                return True
-            
-            # Create catalog if not found
-            if resp.status_code == 404:
-                logger.info(f"Catalog {self.CATALOG_NAME} not found, creating...")
-                create_url = f"https://{self.cluster_host}:8181/api/management/v1/catalogs"
-                # payload matches user's recent edit
-                payload = {
-                    "catalog": {
-                        "name": self.CATALOG_NAME,
-                        "type": "INTERNAL",
-                        "properties": {
-                            "default-base-location": f"s3://gold-curated/iceberg/"
-                        },
-                        "storageConfigInfo": {
-                            "storageType": "S3",
-                            "allowedLocations": [
-                                "s3://gold-curated/iceberg/",
-                                "s3://silver-processed/iceberg/"
-                            ],
-                            "region": "eu-west-1",
-                            "defaultLocation": "s3://gold-curated/iceberg/"
-                        }
-                    }
-                }
-                resp = requests.post(create_url, headers=self.headers, json=payload, verify=False, timeout=5, auth=None)
-                if resp.status_code in [200, 201]:
-                    logger.info(f"Catalog {self.CATALOG_NAME} created successfully")
-                    return True
-                logger.error(f"Failed to create catalog: {resp.status_code} {resp.text}")
-            return False
-        except Exception as e:
-            logger.error(f"Error ensuring catalog exists: {e}")
-            return False
-
-    def _ensure_namespace_exists(self, namespace: str) -> bool:
-        """Ensure a namespace exists within the catalog, creating it if necessary."""
-        if not self.headers: return False
-        try:
-            # Check namespace
-            url = f"https://{self.cluster_host}:8181/api/catalog/v1/{self.CATALOG_NAME}/namespaces/{namespace}"
-            resp = requests.get(url, headers=self.headers, verify=False, timeout=5, auth=None)
-            
-            if resp.status_code == 200:
-                return True
-                
-            # Create namespace if not found
-            if resp.status_code == 404:
-                if not self._ensure_catalog_exists():
-                    return False
-                    
-                logger.info(f"Namespace {namespace} not found in {self.CATALOG_NAME}, creating...")
-                create_url = f"https://{self.cluster_host}:8181/api/catalog/v1/{self.CATALOG_NAME}/namespaces"
-                payload = {
-                    "namespace": [namespace],
-                    "properties": {}
-                }
-                resp = requests.post(create_url, headers=self.headers, json=payload, verify=False, timeout=5, auth=None)
-                if resp.status_code in [200, 201]:
-                    logger.info(f"Namespace {namespace} created successfully")
-                    return True
-                logger.error(f"Failed to create namespace {namespace}: {resp.status_code} {resp.text}")
-            return False
-        except Exception as e:
-            logger.error(f"Error ensuring namespace {namespace} exists: {e}")
-            return False
+        return SqlCatalog("demo_catalog", **catalog_conf)
 
     def test_iceberg(self) -> Dict[str, Any]:
-        if not self.headers:
-            return {"status": "auth_failed", "message": "Missing Polaris credentials"}
-        
-        if self._ensure_catalog_exists():
-            return {"status": "success", "message": "Polaris Catalogue ready"}
-        return {"status": "error", "message": "Polaris Catalogue unavailable"}
+        """Test catalog connectivity."""
+        try:
+            self.catalog.list_namespaces()
+            return {"status": "success", "message": "Iceberg Local Catalog ready"}
+        except Exception as e:
+            logger.error(f"Iceberg catalog test failed: {e}")
+            return {"status": "error", "message": f"Iceberg Catalog error: {str(e)}"}
 
     def list_iceberg_tables(self) -> List[Dict[str, Any]]:
         """List tables across common namespaces for the dashboard."""
-        if not self.headers: return []
-        
-        # We check a few known namespaces for the demo
-        namespaces = ["telemetry", "kpis"]
         all_tables = []
-        
-        for ns in namespaces:
-            if not self._check_catalog_exists() or not self._check_namespace_exists(ns):
-                continue
-            try:
-                url = f"https://{self.cluster_host}:8181/api/catalog/v1/{self.CATALOG_NAME}/namespaces/{ns}/tables"
-                resp = requests.get(url, headers=self.headers, verify=False, auth=None)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    # Polaris nesting: identifiers key contains a list of identifiers
-                    # Each identifier is {"namespace": [...], "name": "..."}
-                    for t in data.get("identifiers", []):
-                        all_tables.append({"name": f"{ns}.{t.get('name')}"})
-            except Exception as e:
-                logger.debug(f"Error listing tables in {ns}: {e}")
-        
+        try:
+            namespaces = self.catalog.list_namespaces()
+            for ns_tuple in namespaces:
+                ns = ns_tuple[0]
+                tables = self.catalog.list_tables(ns)
+                for t_tuple in tables:
+                    # t_tuple is (namespace, table_name)
+                    all_tables.append({"name": f"{ns}.{t_tuple[1]}"})
+        except Exception as e:
+            logger.error(f"Error listing tables: {e}")
         return all_tables
 
-    def create_iceberg_table(self, table_identifier: str, schema: Dict[str, Any]) -> Dict[str, Any]:
+    def create_iceberg_table(self, table_identifier: str, schema_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Create a table. 
-        table_identifier can be "namespace.table" or "catalog.namespace.table"
+        Create an Iceberg table using PyIceberg.
         """
-        if not self.headers:
-            return {"status": "error", "message": "No Polaris credentials"}
-        
-        # Parse identifier
         parts = table_identifier.split(".")
-        if len(parts) >= 3:
-            # catalog.namespace.table
-            ns = parts[1]
-            table_name = parts[2]
-        elif len(parts) == 2:
-            # namespace.table
-            ns = parts[0]
-            table_name = parts[1]
+        if len(parts) == 2:
+            ns, table_name = parts
         else:
-            # table only
             logger.error(f"Invalid table identifier: {table_identifier}")
-            return {"status": "error", "message": "Invalid table identifier"}
-            # ns = "default"
-            # table_name = parts[0]
+            return {"status": "error", "message": "Invalid table identifier. Use namespace.table"}
 
-        # Ensure infrastructure
-        if not self._ensure_namespace_exists(ns):
-            logger.error(f"Failed to ensure namespace {ns}")
-            return {"status": "error", "message": f"Failed to ensure namespace {ns}"}
-
+        # Ensure namespace exists
         try:
-            # Idempotent check
-            existing = [t["name"] for t in self.list_iceberg_tables()]
-            if f"{ns}.{table_name}" in existing:
-                logger.info(f"Table {ns}.{table_name} exists")
-                return {"status": "success", "outcome": "skipped", "message": f"Table {ns}.{table_name} exists"}
-
-            url = f"https://{self.cluster_host}:8181/api/catalog/v1/{self.CATALOG_NAME}/namespaces/{ns}/tables"
-            payload = {
-                "name": table_name,
-                "schema": schema,
-                "storageOptions": {
-                    "location": f"s3://gold-curated/iceberg/{ns}/{table_name}/"
-                }
-            }
-            resp = requests.post(url, headers=self.headers, json=payload, verify=False, auth=None)
-            
-            if resp.status_code in [200, 201, 204]:
-                logger.info(f"Table {ns}.{table_name} created")
-                return {"status": "success", "outcome": "created", "message": f"Table {ns}.{table_name} created"}
-            
-            logger.error(f"Create table failed: {resp.status_code} {resp.text}")
-            return {"status": "error", "message": f"Create table failed: {resp.status_code}"}
+            self.catalog.create_namespace(ns)
+            logger.info(f"Created namespace {ns}")
+        except NamespaceAlreadyExistsError:
+            pass
         except Exception as e:
-            logger.error(f"Error creating table: {e}")
+            logger.error(f"Error creating namespace {ns}: {e}")
+
+        # Map simple schema dict to PyIceberg Schema if needed, 
+        # but for this demo we'll use predefined schemas based on table name
+        try:
+            iceberg_schema = self._get_schema_for_table(table_identifier)
+            
+            # Check if table exists
+            try:
+                self.catalog.load_table(f"{ns}.{table_name}")
+                logger.info(f"Table {ns}.{table_name} already exists")
+                return {"status": "success", "outcome": "skipped", "message": f"Table {ns}.{table_name} exists"}
+            except NoSuchTableError:
+                pass
+
+            self.catalog.create_table(
+                identifier=f"{ns}.{table_name}",
+                schema=iceberg_schema,
+                location=f"s3://gold-curated/iceberg/{ns}/{table_name}/"
+            )
+            
+            logger.info(f"Table {ns}.{table_name} created")
+            return {"status": "success", "outcome": "created", "message": f"Table {ns}.{table_name} created"}
+            
+        except Exception as e:
+            logger.error(f"Error creating table {table_identifier}: {e}")
             return {"status": "error", "message": str(e)}
+
+    def _get_schema_for_table(self, table_identifier: str) -> Schema:
+        """Helper to return PyIceberg Schema objects for known demo tables."""
+        if "cleansed" in table_identifier:
+            return Schema(
+                NestedField(field_id=1, name="event_id", field_type=StringType(), required=True),
+                NestedField(field_id=2, name="device_id", field_type=StringType(), required=True),
+                NestedField(field_id=3, name="timestamp", field_type=TimestampType(), required=True),
+                NestedField(field_id=4, name="temperature", field_type=FloatType(), required=True),
+                NestedField(field_id=5, name="vibration", field_type=FloatType(), required=True),
+                NestedField(field_id=6, name="status", field_type=StringType(), required=True),
+            )
+        elif "kpis" in table_identifier:
+            return Schema(
+                NestedField(field_id=1, name="window_start", field_type=TimestampType(), required=True),
+                NestedField(field_id=2, name="window_end", field_type=TimestampType(), required=True),
+                NestedField(field_id=3, name="total_events", field_type=LongType(), required=True),
+                NestedField(field_id=4, name="avg_temp", field_type=FloatType(), required=True),
+                NestedField(field_id=5, name="anomaly_count", field_type=IntegerType(), required=True),
+            )
+        return Schema(NestedField(field_id=1, name="id", field_type=StringType(), required=True))
