@@ -112,7 +112,8 @@ export default function Dashboard() {
         queryKey: ['lastProcessedRecords'],
         queryFn: async () => {
             const res = await fetch(`${API_BASE}/tables/telemetry.cleansed/data?limit=5`);
-            return res.json();
+            const json = await res.json();
+            return json.data || [];
         },
         enabled: isReady,
         refetchInterval: 3000,
@@ -122,7 +123,8 @@ export default function Dashboard() {
         queryKey: ['lastGoldRecords'],
         queryFn: async () => {
             const res = await fetch(`${API_BASE}/tables/manufacturing.kpis/data?limit=5`);
-            return res.json();
+            const json = await res.json();
+            return json.data || [];
         },
         enabled: isReady,
         refetchInterval: 3000,
@@ -233,193 +235,196 @@ export default function Dashboard() {
             )}
 
             {isConfigured && isReady && (
-                <div className="space-y-6">
-                    {/* Scenario Selector Tabs */}
-                    <div className="flex border-b border-border space-x-8">
-                        {[
-                            { id: 'iot_processing', label: 'IoT Processing', icon: '🏭' },
-                        ].map((scenario) => (
-                            <button
-                                key={scenario.id}
-                                onClick={() => setActiveScenario(scenario.id as any)}
-                                className={`flex items-center gap-2 pb-4 text-sm font-medium transition-all relative ${activeScenario === scenario.id
-                                    ? 'text-indigo-500'
-                                    : 'text-muted-foreground hover:text-foreground'
-                                    }`}
-                            >
-                                <span>{scenario.icon}</span>
-                                {scenario.label}
-                                {activeScenario === scenario.id && (
-                                    <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 animate-in fade-in duration-300"></div>
-                                )}
-                            </button>
-                        ))}
-                        <div className="pb-4 text-xs text-muted-foreground/50 flex items-center italic">
-                            + More scenarios coming soon
+                <div className="space-y-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        {/* Left 3 Columns: Pipeline Stages */}
+                        <div className="lg:col-span-3 space-y-6">
+                            {/* Scenario Selector Tabs */}
+                            <div className="flex border-b border-border space-x-8">
+                                {[
+                                    { id: 'iot_processing', label: 'IoT Processing', icon: '🏭' },
+                                ].map((scenario) => (
+                                    <button
+                                        key={scenario.id}
+                                        onClick={() => setActiveScenario(scenario.id as any)}
+                                        className={`flex items-center gap-2 pb-4 text-sm font-medium transition-all relative ${activeScenario === scenario.id
+                                            ? 'text-indigo-500'
+                                            : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                    >
+                                        <span>{scenario.icon}</span>
+                                        {scenario.label}
+                                        {activeScenario === scenario.id && (
+                                            <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-500 animate-in fade-in duration-300"></div>
+                                        )}
+                                    </button>
+                                ))}
+                                <div className="pb-4 text-xs text-muted-foreground/50 flex items-center italic">
+                                    + More scenarios coming soon
+                                </div>
+                            </div>
+
+                            {activeScenario === 'iot_processing' && (
+                                <div className='space-y-6'>
+                                    {/* Medallion Layers (Overview) */}
+                                    {dashboardData?.readiness && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+                                            <div className="hidden md:block absolute top-1/2 left-0 w-full h-px bg-border -z-10 transform -translate-y-1/2"></div>
+
+                                            {/* Bronze Layer */}
+                                            <div className={`relative bg-card border ${dashboardData.readiness.bronze?.status === 'ready' ? 'border-amber-500/50 shadow-lg shadow-amber-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-amber-500/80 group`}>
+                                                <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4 text-2xl border border-amber-500/20 group-hover:scale-110 transition-transform">
+                                                    🥉
+                                                </div>
+                                                <h3 className="text-lg font-bold text-amber-600 dark:text-amber-500 mb-2">Bronze Layer</h3>
+                                                <p className="text-xs text-muted-foreground mb-4">Raw telemetry ingestion</p>
+                                                <div className="w-full space-y-2 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
+                                                    <StatusItem label="Topic: telemetry.raw" active={dashboardData.readiness.bronze?.details?.topic} onClick={() => { setSelectedResourceType('Topics'); setModalOpen(true); fetchResourceDetails('Topics', 'manufacturing.telemetry.raw'); }} />
+                                                    <StatusItem label="Bucket: bronze-bucket" active={dashboardData.readiness.bronze?.details?.bucket} onClick={() => { setSelectedResourceType('Buckets'); setModalOpen(true); fetchResourceDetails('Buckets', 'bronze-bucket'); }} />
+                                                </div>
+                                            </div>
+
+                                            {/* Silver Layer */}
+                                            <div className={`relative bg-card border ${dashboardData.readiness.silver?.status === 'ready' ? 'border-silver-500/50 shadow-lg shadow-silver-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-silver-500/80 group`}>
+                                                <div className="w-12 h-12 rounded-full bg-silver-500/10 flex items-center justify-center mb-4 text-2xl border border-silver-500/20 group-hover:scale-110 transition-transform">
+                                                    🥈
+                                                </div>
+                                                <h3 className="text-lg font-bold text-silver-600 dark:text-silver-400 mb-2">Silver Layer</h3>
+                                                <p className="text-xs text-muted-foreground mb-4">Cleansed & Enriched</p>
+                                                <div className="w-full space-y-2 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
+                                                    <StatusItem label="Table: telemetry.cleansed" active={dashboardData.readiness.silver?.details?.table} onClick={() => { setSelectedResourceType('Tables'); setModalOpen(true); fetchResourceDetails('Tables', 'telemetry.cleansed'); }} />
+                                                    <StatusItem label="Bucket: silver-bucket" active={dashboardData.readiness.silver?.details?.bucket} onClick={() => { setSelectedResourceType('Buckets'); setModalOpen(true); fetchResourceDetails('Buckets', 'silver-bucket'); }} />
+                                                </div>
+                                            </div>
+
+                                            {/* Gold Layer */}
+                                            <div className={`relative bg-card border ${dashboardData.readiness.gold?.status === 'ready' ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-yellow-500/80 group`}>
+                                                <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mb-4 text-2xl border border-yellow-500/20 group-hover:scale-110 transition-transform">
+                                                    🥇
+                                                </div>
+                                                <h3 className="text-lg font-bold text-yellow-600 dark:text-yellow-400 mb-2">Gold Layer</h3>
+                                                <p className="text-xs text-muted-foreground mb-4">Aggregated KPIs</p>
+                                                <div className="w-full space-y-2 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
+                                                    <StatusItem label="Table: manufacturing.kpis" active={dashboardData?.readiness?.gold?.details?.table} onClick={() => { setSelectedResourceType('Tables'); setModalOpen(true); fetchResourceDetails('Tables', 'manufacturing.kpis'); }} />
+                                                    <StatusItem label="Bucket: gold-bucket" active={dashboardData?.readiness?.gold?.details?.bucket} onClick={() => { setSelectedResourceType('Buckets'); setModalOpen(true); fetchResourceDetails('Buckets', 'gold-bucket'); }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                </div>
+                            )}
+
+                            {/* Layer Specific Details & Controls */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* BRONZE CONTROLS */}
+                                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col">
+                                    <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                                        Ingestion
+                                    </h4>
+                                    <div className="mb-6">
+                                        <ProcessingStatus
+                                            latestMessageTime={detailedMetrics?.latest_message_timestamp}
+                                            lastProcessedTime={detailedMetrics?.last_processed_timestamp}
+                                            lagSeconds={detailedMetrics?.lag_seconds || 0}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={() => scenarioMutation.mutate({ type: 'iot_streaming', label: 'Ingestion' })}
+                                        disabled={isIngesting || scenarioMutation.isPending}
+                                        className="w-full flex flex-col items-center justify-center p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 group"
+                                    >
+                                        <span className="text-2xl mb-1 group-hover:animate-bounce">⚡</span>
+                                        <span className="font-semibold text-sm">Start Real-time Stream</span>
+                                        <span className="text-[10px] text-muted-foreground mt-1">100 msgs / batch</span>
+                                    </button>
+                                </div>
+
+                                {/* SILVER & GOLD PREVIEW */}
+                                <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col">
+                                    <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-silver-500"></span>
+                                        Live Pipeline Preview
+                                    </h4>
+                                    <div className="flex-1 space-y-3">
+                                        <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                                            <p className="text-[10px] font-bold text-silver-400 uppercase tracking-wider mb-2">Cleansed Feed (Silver)</p>
+                                            <div className="space-y-1">
+                                                {lastProcessedRecords?.slice(0, 3).map((rec: any, i: number) => (
+                                                    <div key={i} className="flex justify-between text-[9px] font-mono border-b border-border/30 pb-1 last:border-0">
+                                                        <span className="text-muted-foreground truncate max-w-[80px]">{rec.device_id}</span>
+                                                        <span className="text-foreground">{rec.temperature?.toFixed(1)}°C</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
+                                            <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider mb-2">KPI Metrics (Gold)</p>
+                                            <div className="space-y-1">
+                                                {lastGoldRecords?.slice(0, 2).map((rec: any, i: number) => (
+                                                    <div key={i} className="flex justify-between text-[9px] font-mono border-b border-border/30 pb-1 last:border-0">
+                                                        <span className="text-muted-foreground">Events Count</span>
+                                                        <span className="text-foreground">{rec.total_events}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Platform Unified Feed & Discovery */}
+                        <div className="space-y-6 lg:border-l lg:border-border lg:pl-6">
+                            {/* Summary Widget */}
+                            <div className="bg-muted/10 border border-indigo-500/10 rounded-2xl p-5 space-y-4">
+                                <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                                    Unified Data Fabric
+                                </h4>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] text-muted-foreground">Topics</span>
+                                        <span className="text-xs font-bold font-mono">{dashboardData?.readiness && dashboardData.topics.length}</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] text-muted-foreground">Buckets</span>
+                                        <span className="text-xs font-bold font-mono">{dashboardData?.readiness && dashboardData.buckets.length}</span>
+                                    </div>
+                                    <div className="flex justify-between items-end">
+                                        <span className="text-[10px] text-muted-foreground">Iceberg Catalogs</span>
+                                        <span className="text-xs font-bold font-mono">{dashboardData?.readiness && dashboardData.tables.length}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Integrated Real-time Feed */}
+                            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col h-[480px]">
+                                <div className="bg-muted/40 p-4 border-b border-border flex justify-between items-center">
+                                    <h3 className="text-xs font-bold flex items-center gap-2 uppercase tracking-tight">
+                                        📡 System Live Feed
+                                    </h3>
+                                    <div className="flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span className="text-[8px] font-bold text-emerald-500 uppercase">Live</span>
+                                    </div>
+                                </div>
+                                <div className="flex-1 p-3 overflow-y-auto font-mono text-[10px] space-y-3 bg-muted/80">
+                                    {actionLogs.map((log, idx) => (
+                                        <div key={`act-${idx}`} className="text-muted-foreground border-l border-white/10 pl-2 py-0.5 italic">
+                                            👉 {log}
+                                        </div>
+                                    ))}
+                                    {!actionLogs.length && (
+                                        <div className="h-full flex items-center justify-center opacity-30 italic text-center px-4">
+                                            Waiting for activity...
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    {activeScenario === 'iot_processing' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            {/* Left 3 Columns: Pipeline Stages */}
-                            <div className="lg:col-span-3 space-y-8">
-                                {/* Medallion Layers (Overview) */}
-                                {dashboardData?.readiness && (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
-                                        <div className="hidden md:block absolute top-1/2 left-0 w-full h-px bg-border -z-10 transform -translate-y-1/2"></div>
-
-                                        {/* Bronze Layer */}
-                                        <div className={`relative bg-card border ${dashboardData.readiness.bronze?.status === 'ready' ? 'border-amber-500/50 shadow-lg shadow-amber-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-amber-500/80 group`}>
-                                            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mb-4 text-2xl border border-amber-500/20 group-hover:scale-110 transition-transform">
-                                                🥉
-                                            </div>
-                                            <h3 className="text-lg font-bold text-amber-600 dark:text-amber-500 mb-2">Bronze Layer</h3>
-                                            <p className="text-xs text-muted-foreground mb-4">Raw telemetry ingestion</p>
-                                            <div className="w-full space-y-2 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
-                                                <StatusItem label="Topic: telemetry.raw" active={dashboardData.readiness.bronze?.details?.topic} onClick={() => { setSelectedResourceType('Topics'); setModalOpen(true); fetchResourceDetails('Topics', 'manufacturing.telemetry.raw'); }} />
-                                                <StatusItem label="Bucket: bronze-raw" active={dashboardData.readiness.bronze?.details?.bucket} onClick={() => { setSelectedResourceType('Buckets'); setModalOpen(true); fetchResourceDetails('Buckets', 'bronze-raw'); }} />
-                                            </div>
-                                        </div>
-
-                                        {/* Silver Layer */}
-                                        <div className={`relative bg-card border ${dashboardData.readiness.silver?.status === 'ready' ? 'border-indigo-500/50 shadow-lg shadow-indigo-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-indigo-500/80 group`}>
-                                            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4 text-2xl border border-indigo-500/20 group-hover:scale-110 transition-transform">
-                                                🥈
-                                            </div>
-                                            <h3 className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-2">Silver Layer</h3>
-                                            <p className="text-xs text-muted-foreground mb-4">Cleansed & Enriched</p>
-                                            <div className="w-full space-y-2 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
-                                                <StatusItem label="Table: telemetry.cleansed" active={dashboardData.readiness.silver?.details?.table} onClick={() => { setSelectedResourceType('Tables'); setModalOpen(true); fetchResourceDetails('Tables', 'telemetry.cleansed'); }} />
-                                                <StatusItem label="Bucket: silver-processed" active={dashboardData.readiness.silver?.details?.bucket} onClick={() => { setSelectedResourceType('Buckets'); setModalOpen(true); fetchResourceDetails('Buckets', 'silver-processed'); }} />
-                                            </div>
-                                        </div>
-
-                                        {/* Gold Layer */}
-                                        <div className={`relative bg-card border ${dashboardData.readiness.gold?.status === 'ready' ? 'border-yellow-500/50 shadow-lg shadow-yellow-500/5' : 'border-border'} rounded-xl p-6 flex flex-col items-center text-center transition-all hover:border-yellow-500/80 group`}>
-                                            <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center mb-4 text-2xl border border-yellow-500/20 group-hover:scale-110 transition-transform">
-                                                🥇
-                                            </div>
-                                            <h3 className="text-lg font-bold text-yellow-600 dark:text-yellow-400 mb-2">Gold Layer</h3>
-                                            <p className="text-xs text-muted-foreground mb-4">Aggregated KPIs</p>
-                                            <div className="w-full space-y-2 text-left text-xs bg-muted/30 p-3 rounded-lg border border-border/50">
-                                                <StatusItem label="Table: manufacturing.kpis" active={dashboardData?.readiness?.gold?.details?.table} onClick={() => { setSelectedResourceType('Tables'); setModalOpen(true); fetchResourceDetails('Tables', 'manufacturing.kpis'); }} />
-                                                <StatusItem label="Bucket: gold-curated" active={dashboardData?.readiness?.gold?.details?.bucket} onClick={() => { setSelectedResourceType('Buckets'); setModalOpen(true); fetchResourceDetails('Buckets', 'gold-curated'); }} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Layer Specific Details & Controls */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {/* BRONZE CONTROLS */}
-                                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col">
-                                        <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                            Ingestion
-                                        </h4>
-                                        <div className="mb-6">
-                                            <ProcessingStatus
-                                                latestMessageTime={detailedMetrics?.latest_message_timestamp}
-                                                lastProcessedTime={detailedMetrics?.last_processed_timestamp}
-                                                lagSeconds={detailedMetrics?.lag_seconds || 0}
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => scenarioMutation.mutate({ type: 'iot_streaming', label: 'Ingestion' })}
-                                            disabled={isIngesting || scenarioMutation.isPending}
-                                            className="w-full flex flex-col items-center justify-center p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 group"
-                                        >
-                                            <span className="text-2xl mb-1 group-hover:animate-bounce">⚡</span>
-                                            <span className="font-semibold text-sm">Start Real-time Stream</span>
-                                            <span className="text-[10px] text-muted-foreground mt-1">100 msgs / batch</span>
-                                        </button>
-                                    </div>
-
-                                    {/* SILVER & GOLD PREVIEW */}
-                                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col">
-                                        <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
-                                            <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                                            Live Pipeline Preview
-                                        </h4>
-                                        <div className="flex-1 space-y-3">
-                                            <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
-                                                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2">Cleansed Feed (Silver)</p>
-                                                <div className="space-y-1">
-                                                    {lastProcessedRecords?.slice(0, 3).map((rec: any, i: number) => (
-                                                        <div key={i} className="flex justify-between text-[9px] font-mono border-b border-border/30 pb-1 last:border-0">
-                                                            <span className="text-muted-foreground truncate max-w-[80px]">{rec.device_id}</span>
-                                                            <span className="text-foreground">{rec.temperature?.toFixed(1)}°C</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                            <div className="bg-muted/30 p-3 rounded-xl border border-border/50">
-                                                <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider mb-2">KPI Metrics (Gold)</p>
-                                                <div className="space-y-1">
-                                                    {lastGoldRecords?.slice(0, 2).map((rec: any, i: number) => (
-                                                        <div key={i} className="flex justify-between text-[9px] font-mono border-b border-border/30 pb-1 last:border-0">
-                                                            <span className="text-muted-foreground">Events Count</span>
-                                                            <span className="text-foreground">{rec.total_events}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right Column: Platform Unified Feed & Discovery */}
-                            <div className="space-y-6 lg:border-l lg:border-border lg:pl-6">
-                                {/* Summary Widget */}
-                                <div className="bg-muted/10 border border-indigo-500/10 rounded-2xl p-5 space-y-4">
-                                    <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                                        Unified Data Fabric
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] text-muted-foreground">Active Topics</span>
-                                            <span className="text-xs font-bold font-mono">TODO</span>
-                                        </div>
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] text-muted-foreground">Buckets</span>
-                                            <span className="text-xs font-bold font-mono">TODO</span>
-                                        </div>
-                                        <div className="flex justify-between items-end">
-                                            <span className="text-[10px] text-muted-foreground">Iceberg Catalogs</span>
-                                            <span className="text-xs font-bold font-mono">TODO</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Integrated Real-time Feed */}
-                                <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col h-[480px]">
-                                    <div className="bg-muted/40 p-4 border-b border-border flex justify-between items-center">
-                                        <h3 className="text-xs font-bold flex items-center gap-2 uppercase tracking-tight">
-                                            📡 System Live Feed
-                                        </h3>
-                                        <div className="flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                            <span className="text-[8px] font-bold text-emerald-500 uppercase">Live</span>
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 p-3 overflow-y-auto font-mono text-[10px] space-y-3 bg-[#050505]">
-                                        {actionLogs.map((log, idx) => (
-                                            <div key={`act-${idx}`} className="text-muted-foreground border-l border-white/10 pl-2 py-0.5 italic">
-                                                👉 {log}
-                                            </div>
-                                        ))}
-                                        {!actionLogs.length && (
-                                            <div className="h-full flex items-center justify-center opacity-30 italic text-center px-4">
-                                                Waiting for platform activity...
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -448,35 +453,47 @@ export default function Dashboard() {
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
                             {fetchingData ? (
                                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-silver-500"></div>
                                     <p className="text-muted-foreground animate-pulse text-sm font-medium">Fetching real-time data...</p>
                                 </div>
                             ) : resourceData ? (
                                 <div className="space-y-6">
                                     {selectedResourceType === 'Buckets' && (
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between px-2">
-                                                <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Objects</h4>
-                                                <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full font-mono">{resourceData.length} items</span>
+                                        <div className="space-y-6">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl text-center">
+                                                    <div className="text-xl font-bold text-amber-500 font-mono">{resourceData.object_count.toLocaleString()}</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Total Objects</div>
+                                                </div>
+                                                <div className="bg-amber-500/5 border border-amber-500/20 p-4 rounded-2xl text-center">
+                                                    <div className="text-xl font-bold text-amber-500 font-mono">{(resourceData.total_size / 1024).toFixed(2)} KB</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Total Size</div>
+                                                </div>
                                             </div>
-                                            <div className="grid grid-cols-1 gap-2">
-                                                {resourceData.map((o: any, i: number) => (
-                                                    <div key={i} className="flex items-center justify-between p-3 bg-muted/40 border border-border/50 rounded-xl hover:bg-muted/60 transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="text-xl">📦</span>
-                                                            <div className="flex flex-col">
-                                                                <span className="font-medium text-sm">{o.key}</span>
-                                                                <span className="text-[10px] text-muted-foreground">{new Date(o.last_modified).toLocaleString()}</span>
+
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between px-2">
+                                                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Objects</h4>
+                                                </div>
+                                                <div className="grid grid-cols-1 gap-2">
+                                                    {resourceData.objects.map((o: any, i: number) => (
+                                                        <div key={i} className="flex items-center justify-between p-3 bg-muted/40 border border-border/50 rounded-xl hover:bg-muted/60 transition-colors">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-xl">📦</span>
+                                                                <div className="flex flex-col">
+                                                                    <span className="font-medium text-sm">{o.key}</span>
+                                                                    <span className="text-[10px] text-muted-foreground">{new Date(o.last_modified).toLocaleString()}</span>
+                                                                </div>
                                                             </div>
+                                                            <span className="text-xs font-mono text-muted-foreground">{(o.size / 1024).toFixed(2)} KB</span>
                                                         </div>
-                                                        <span className="text-xs font-mono text-muted-foreground">{(o.size / 1024).toFixed(2)} KB</span>
-                                                    </div>
-                                                ))}
-                                                {resourceData.length === 0 && (
-                                                    <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed border-border text-muted-foreground text-sm italic">
-                                                        Bucket is empty
-                                                    </div>
-                                                )}
+                                                    ))}
+                                                    {resourceData.object_count === 0 && (
+                                                        <div className="text-center py-10 bg-muted/20 rounded-xl border border-dashed border-border text-muted-foreground text-sm italic">
+                                                            Bucket is empty
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )}
@@ -526,40 +543,59 @@ export default function Dashboard() {
                                     )}
 
                                     {selectedResourceType === 'Tables' && (
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between px-2">
-                                                <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Table Sample</h4>
-                                                <span className="text-[10px] bg-cyan-500/10 text-cyan-500 px-2 py-0.5 rounded-full font-mono">{resourceData.length} records</span>
+                                        <div className="space-y-6">
+                                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                                <div className="bg-cyan-500/5 border border-cyan-500/20 p-4 rounded-2xl text-center">
+                                                    <div className="text-xl font-bold text-cyan-500 font-mono">{resourceData.metrics?.record_count?.toLocaleString() || 0}</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Total Records</div>
+                                                </div>
+                                                <div className="bg-cyan-500/5 border border-cyan-500/20 p-4 rounded-2xl text-center">
+                                                    <div className="text-xl font-bold text-cyan-500 font-mono">{resourceData.metrics?.snapshot_count || 0}</div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Snapshots</div>
+                                                </div>
+                                                <div className="bg-cyan-500/5 border border-cyan-500/20 p-4 rounded-2xl text-center col-span-2">
+                                                    <div className="text-[10px] font-bold text-cyan-500 font-mono truncate">
+                                                        {resourceData.metrics?.last_updated ? new Date(resourceData.metrics.last_updated).toLocaleString() : 'Never'}
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Last Updated</div>
+                                                </div>
                                             </div>
-                                            <div className="border border-border/50 rounded-xl overflow-hidden shadow-lg bg-background/50 backdrop-blur-md">
-                                                {resourceData.length > 0 ? (
-                                                    <div className="overflow-x-auto">
-                                                        <table className="w-full text-[11px] text-left">
-                                                            <thead className="bg-muted/50 border-b border-border/50 text-muted-foreground">
-                                                                <tr>
-                                                                    {Object.keys(resourceData[0]).map(k => (
-                                                                        <th key={k} className="px-4 py-3 font-bold uppercase tracking-tighter whitespace-nowrap">{k}</th>
-                                                                    ))}
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y divide-border/30">
-                                                                {resourceData.map((row: any, i: number) => (
-                                                                    <tr key={i} className="hover:bg-cyan-500/5 transition-colors">
-                                                                        {Object.values(row).map((v: any, j: number) => (
-                                                                            <td key={j} className="px-4 py-2.5 font-mono text-foreground/80 whitespace-nowrap">
-                                                                                {v?.toString() || 'null'}
-                                                                            </td>
+
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between px-2">
+                                                    <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Table Sample</h4>
+                                                    <span className="text-[10px] bg-cyan-500/10 text-cyan-500 px-2 py-0.5 rounded-full font-mono">{resourceData.data.length} records</span>
+                                                </div>
+                                                <div className="border border-border/50 rounded-xl overflow-hidden shadow-lg bg-background/50 backdrop-blur-md">
+                                                    {resourceData.data.length > 0 ? (
+                                                        <div className="overflow-x-auto">
+                                                            <table className="w-full text-[11px] text-left">
+                                                                <thead className="bg-muted/50 border-b border-border/50 text-muted-foreground">
+                                                                    <tr>
+                                                                        {Object.keys(resourceData.data[0]).map(k => (
+                                                                            <th key={k} className="px-4 py-3 font-bold uppercase tracking-tighter whitespace-nowrap">{k}</th>
                                                                         ))}
                                                                     </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-center py-20 bg-muted/20 text-muted-foreground text-sm italic font-medium">
-                                                        Table contains no data
-                                                    </div>
-                                                )}
+                                                                </thead>
+                                                                <tbody className="divide-y divide-border/30">
+                                                                    {resourceData.data.map((row: any, i: number) => (
+                                                                        <tr key={i} className="hover:bg-cyan-500/5 transition-colors">
+                                                                            {Object.values(row).map((v: any, j: number) => (
+                                                                                <td key={j} className="px-4 py-2.5 font-mono text-foreground/80 whitespace-nowrap">
+                                                                                    {v?.toString() || 'null'}
+                                                                                </td>
+                                                                            ))}
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-center py-20 bg-muted/20 text-muted-foreground text-sm italic font-medium">
+                                                            Table contains no data
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     )}

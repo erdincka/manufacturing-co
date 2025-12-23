@@ -199,6 +199,15 @@ class S3Service(BaseDataFabricService):
             logger.error(f"Error listing objects in bucket {bucket_name}: {e}")
             return []
 
+    def get_bucket_metrics(self, bucket_name: str) -> Dict[str, Any]:
+        objects = self.list_objects(bucket_name)
+        return {
+            "name": bucket_name,
+            "object_count": len(objects),
+            "total_size": sum(obj["size"] for obj in objects),
+            "objects": objects,
+        }
+
     def read_object(self, bucket_name: str, object_key: str) -> str:
         self.ensure_valid_credentials()
         if not BOTO3_AVAILABLE:

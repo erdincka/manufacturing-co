@@ -20,6 +20,9 @@ from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 logger = logging.getLogger("api.services.iceberg")
 
 
+DEFAULT_BUCKET = "bronze-bucket"
+
+
 def retry_iceberg(max_retries=3, delay=1):
     def decorator(func):
         import time
@@ -52,7 +55,8 @@ class IcebergService(BaseDataFabricService):
 
     def _init_catalog(self) -> SqlCatalog:
         """Initialize the local SQL catalog."""
-        warehouse_path = f"s3://gold-curated/iceberg/"
+        # Default warehouse path, but we override location per table in create_table
+        warehouse_path = f"s3://{DEFAULT_BUCKET}/iceberg/"
 
         # PyIceberg SQL Catalog configuration
         catalog_conf = {
@@ -128,7 +132,7 @@ class IcebergService(BaseDataFabricService):
         return all_tables
 
     def create_iceberg_table(
-        self, table_identifier: str, schema_dict: Dict[str, Any]
+        self, bucket: str, table_identifier: str, schema_dict: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Create an Iceberg table using PyIceberg.
@@ -148,6 +152,7 @@ class IcebergService(BaseDataFabricService):
             self.catalog.create_namespace(ns)
             logger.info(f"Created namespace {ns}")
         except NamespaceAlreadyExistsError:
+            logger.info(f"Skipped creating existing namespace {ns}")
             pass
         except Exception as e:
             logger.error(f"Error creating namespace {ns}: {e}")
@@ -169,18 +174,15 @@ class IcebergService(BaseDataFabricService):
             except NoSuchTableError:
                 pass
 
-            # Determine warehouse bucket based on table name (Medallion architecture)
-            if "cleansed" in table_identifier:
-                bucket = "silver-processed"
-            elif "kpis" in table_identifier:
-                bucket = "gold-curated"
-            else:
-                bucket = "gold-curated"
+            # Explicitly set the location to ensure it goes to the correct bucket
+            # PyIceberg SQL catalog uses the warehouse path by default, but we override it here.
+            table_location = f"s3://{bucket}/iceberg/{ns}/{table_name}/"
+            logger.info(f"Creating table {table_identifier} at {table_location}")
 
             self.catalog.create_table(
                 identifier=f"{ns}.{table_name}",
                 schema=iceberg_schema,
-                location=f"s3://{bucket}/iceberg/{ns}/{table_name}/",
+                location=table_location,
             )
 
             logger.info(f"Table {ns}.{table_name} created")

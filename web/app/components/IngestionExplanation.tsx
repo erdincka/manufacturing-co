@@ -22,7 +22,7 @@ export function IngestionExplanation({ mode, isOpen, onClose }: IngestionExplana
                 },
                 {
                     phase: "2. Data Storage",
-                    description: "Write CSV file to S3 bronze bucket (bronze-raw/batch_ingest.csv) for persistent storage and auditability",
+                    description: "Write CSV file to S3 bronze bucket (bronze-bucket/batch_ingest.csv) for persistent storage and auditability",
                     tech: "S3 PutObject API with boto3",
                     icon: "💾"
                 },

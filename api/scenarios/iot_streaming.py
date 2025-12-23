@@ -49,12 +49,6 @@ def iot_streaming_scenario(
         logs.append(f"✕ Failed to ingest data: {str(e)}")
         yield {"error": str(e)}
 
-    # log_demo_event("default", "scenario", f"Ingested {count} events to Bronze layer")
-
-    # Process Raw -> Silver (Iceberg)
-    # log_demo_event(
-    #     "default", "scenario", "Starting data processing job (Bronze -> Silver)..."
-    # )
     logs.append("Reading batch from 'manufacturing.telemetry.raw'...")
 
     # Read messages from all partitions
@@ -83,6 +77,7 @@ def iot_streaming_scenario(
             if validate_message(idx, message):
                 cleansed_records.append(message)
             else:
+                logs.append(f"Discarding invalid record {idx}: {message}")
                 invalid_message_count += 1
 
         logs.append(
@@ -97,14 +92,6 @@ def iot_streaming_scenario(
         "target": "telemetry.cleansed",
     }
 
-    # log_demo_event("default", "scenario", "Processing job completed")
-
-    # Aggregate Silver -> Gold
-    # log_demo_event(
-    #     "default",
-    #     "scenario",
-    #     "Starting curation/aggregation job (Silver -> Gold)...",
-    # )
     logs.append("Querying 'manufacturing.telemetry.cleansed' for KPI calculation...")
     # TODO: fix the logic
     time.sleep(1)

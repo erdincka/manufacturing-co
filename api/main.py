@@ -3,9 +3,7 @@ import os
 import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
-from uuid import uuid4
 import urllib3
-import io
 
 from scenarios.iot_streaming import iot_streaming_scenario
 from services.db import get_db_connection, init_db
@@ -88,6 +86,10 @@ class EndpointFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(EndpointFilter())
 
 # -- App setup
+
+BRONZE_BUCKET = "bronze-bucket"
+SILVER_BUCKET = "silver-bucket"
+GOLD_BUCKET = "gold-bucket"
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -585,15 +587,15 @@ def get_dashboard_data():
         # Medallion Architecture mapping for readiness check and filtering
         medallion_expectations = {
             "bronze": {
-                "bucket": "bronze-raw",
+                "bucket": BRONZE_BUCKET,
                 "topic": "manufacturing.telemetry.raw",
             },
             "silver": {
-                "bucket": "silver-processed",
+                "bucket": SILVER_BUCKET,
                 "table": "telemetry.cleansed",
             },
             "gold": {
-                "bucket": "gold-curated",
+                "bucket": GOLD_BUCKET,
                 "table": "manufacturing.kpis",
             },
         }
@@ -682,7 +684,7 @@ def get_bucket_objects(name: str):
     if not profile:
         raise HTTPException(status_code=400, detail="Profile not configured")
     connector = DataFabricConnector(profile)
-    return connector.list_objects(name)
+    return connector.get_bucket_metrics(name)
 
 
 @app.get("/topics/{name}/metrics")
@@ -719,7 +721,9 @@ def get_table_data_endpoint(name: str):
     if not profile:
         raise HTTPException(status_code=400, detail="Profile not configured")
     connector = DataFabricConnector(profile)
-    return connector.get_table_data(name)
+    data = connector.get_table_data(name)
+    metrics = connector.iceberg.get_table_metrics(name)
+    return {"data": data, "metrics": metrics}
 
 
 @app.get("/tables/{name}/metrics")
@@ -804,7 +808,7 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
     tables = []
 
     # Create S3 buckets
-    buckets = ["bronze-raw", "silver-processed", "gold-curated"]
+    buckets = [BRONZE_BUCKET, SILVER_BUCKET, GOLD_BUCKET]
     for bucket in buckets:
         logs.append(f"Checking bucket: {bucket}...")
         result = connector.create_bucket(bucket)
@@ -843,7 +847,7 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
 
     # Create Iceberg tables
     table_schemas = {
-        "telemetry.cleansed": {
+        f"{BRONZE_BUCKET}.telemetry.cleansed": {
             "type": "struct",
             "schema-id": 1,
             "fields": [
@@ -855,7 +859,7 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
                 {"id": 6, "required": True, "name": "status", "type": "string"},
             ],
         },
-        "manufacturing.kpis": {
+        f"{GOLD_BUCKET}.manufacturing.kpis": {
             "type": "struct",
             "schema-id": 1,
             "fields": [
@@ -873,9 +877,10 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
         },
     }
 
-    for table_name, schema in table_schemas.items():
-        logs.append(f"Checking table: {table_name}...")
-        result = connector.create_iceberg_table(table_name, schema)
+    for key, schema in table_schemas.items():
+        bucket, table_name = key.split(".", maxsplit=1)
+        logs.append(f"Checking table: {table_name} in bucket {bucket}...")
+        result = connector.create_iceberg_table(bucket, table_name, schema)
         tables.append(result.get("table", {}))
 
         outcome = result.get("outcome", "unknown")
@@ -887,7 +892,6 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
             msg = f"✕ Failed to create table {table_name}: {result.get('message')}"
 
         logs.append(msg)
-        # log_demo_event("default", "bootstrap", msg)
 
     # Update bootstrap state
     conn = get_db_connection()
@@ -964,168 +968,6 @@ def get_sqlite_table_content(table_name: str, limit: int = 100):
         return [dict(row) for row in rows]
     finally:
         conn.close()
-
-
-# --- Batch Ingestion Endpoints ---
-
-
-# @app.post("/scenarios/generate_batch_csv")
-# def generate_batch_csv():
-#     """Generate a CSV file with telemetry data in the bronze S3 bucket."""
-#     profile = get_profile_from_db()
-#     if not profile:
-#         raise HTTPException(status_code=400, detail="Profile not configured")
-
-#     connector = DataFabricConnector(profile)
-
-#     try:
-#         import csv
-#         import random
-#         import io
-#         from datetime import datetime, timedelta
-
-#         # Generate 100 sample records
-#         records = []
-#         devices = ["CNC-001", "CNC-002", "ROBOT-A", "ROBOT-B", "PRESS-04"]
-
-#         for _ in range(100):
-#             record = {
-#                 "event_id": str(uuid4()),
-#                 "device_id": random.choice(devices),
-#                 "timestamp": datetime.now(timezone.utc).isoformat(),
-#                 "temperature": random.uniform(60, 95),
-#                 "vibration": random.uniform(0.1, 5.0),
-#                 "status": random.choice(
-#                     ["OK", "OK", "OK", "OK", "OK", "OK", "WARNING"]
-#                 ),
-#             }
-#             records.append(record)
-
-#         # Write CSV to string buffer
-#         csv_buffer = io.StringIO()
-#         writer = csv.DictWriter(csv_buffer, fieldnames=records[0].keys())
-#         writer.writeheader()
-#         writer.writerows(records)
-#         csv_content = csv_buffer.getvalue()
-
-#         bucket_name = "bronze-raw"
-#         object_key = "batch_ingest.csv"
-
-#         if connector.s3.put_object(
-#             bucket_name, object_key, csv_content.encode("utf-8")
-#         ):
-#             # log_demo_event(
-#             #     "default",
-#             #     "batch_csv_generated",
-#             #     f"Generated {len(records)} records in s3://{bucket_name}/{object_key}",
-#             # )
-#             return {
-#                 "status": "success",
-#                 "message": f"Generated {len(records)} records",
-#                 "bucket": bucket_name,
-#                 "key": object_key,
-#                 "record_count": len(records),
-#                 "preview": records[:5],  # Show first 5 records
-#             }
-#         else:
-#             # log_demo_event(
-#             #     "default",
-#             #     "batch_csv_generated failed with S3 put",
-#             #     f"Unknown S3 Put error for s3://{bucket_name}/{object_key}",
-#             # )
-#             return {
-#                 "status": "error",
-#                 "message": f"Failed to put csv file into s3://{bucket_name}/{object_key}",
-#             }
-
-#     except Exception as e:
-#         logger.error(f"Failed to generate batch CSV: {e}")
-#         return {"status": "error", "message": str(e)}
-
-
-# @app.get("/scenarios/preview_batch_csv")
-# def preview_batch_csv():
-#     """Preview the content of the batch CSV file from S3."""
-#     profile = get_profile_from_db()
-#     if not profile:
-#         raise HTTPException(status_code=400, detail="Profile not configured")
-
-#     connector = DataFabricConnector(profile)
-
-#     try:
-#         import csv
-
-#         bucket_name = "bronze-raw"
-#         object_key = "batch_ingest.csv"
-#         csv_content = connector.s3.read_object(bucket_name, object_key)
-#         # Parse CSV
-#         records = []
-#         reader = csv.DictReader(io.StringIO(csv_content))
-#         for row in reader:
-#             records.append(row)
-
-#         return {
-#             "status": "success",
-#             "bucket": bucket_name,
-#             "key": object_key,
-#             "record_count": len(records),
-#             "records": records,
-#         }
-#     except Exception as e:
-#         logger.error(f"Failed to preview CSV: {e}")
-#         if "NoSuchKey" in str(e):
-#             return {
-#                 "status": "error",
-#                 "message": "CSV file not found. Generate it first.",
-#             }
-#         return {"status": "error", "message": str(e)}
-
-
-# @app.post("/scenarios/publish_batch")
-# def publish_batch():
-#     """Publish the batch CSV from S3 to Kafka topic."""
-#     profile = get_profile_from_db()
-#     if not profile:
-#         raise HTTPException(status_code=400, detail="Profile not configured")
-
-#     connector = DataFabricConnector(profile)
-
-#     try:
-#         import csv
-
-#         bucket_name = "bronze-raw"
-#         object_key = "batch_ingest.csv"
-#         csv_content = connector.s3.read_object(bucket_name, object_key)
-
-#         # Parse CSV and publish to Kafka
-#         topic_name = "manufacturing.telemetry.raw"
-
-#         count = 0
-#         reader = csv.DictReader(io.StringIO(csv_content))
-#         if connector.kafka.push_messages(topic_name, [row for row in reader]):
-#             count = len([row for row in reader])
-
-#         # log_demo_event(
-#         #     "default",
-#         #     "batch_published",
-#         #     f"Published {count} records from s3://{bucket_name}/{object_key} to {topic_name}",
-#         # )
-
-#         return {
-#             "status": "success",
-#             "message": f"Published {count} records to {topic_name}",
-#             "bucket": bucket_name,
-#             "key": object_key,
-#             "record_count": count,
-#         }
-#     except Exception as e:
-#         logger.error(f"Failed to publish batch: {e}")
-#         if "NoSuchKey" in str(e):
-#             return {
-#                 "status": "error",
-#                 "message": "CSV file not found. Generate it first.",
-#             }
-#         return {"status": "error", "message": str(e)}
 
 
 # --- Scenario Runner Endpoints ---

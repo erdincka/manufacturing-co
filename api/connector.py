@@ -104,6 +104,9 @@ class DataFabricConnector:
     def list_buckets(self):
         return self.s3.list_buckets()
 
+    def get_bucket_metrics(self, bucket_name: str):
+        return self.s3.get_bucket_metrics(bucket_name)
+
     def list_objects(self, bucket_name: str):
         return self.s3.list_objects(bucket_name)
 
