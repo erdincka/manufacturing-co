@@ -4,16 +4,9 @@ import requests
 from requests.auth import HTTPBasicAuth
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from typing import List, Optional, Dict, Any
-from pathlib import Path
-import os
-import json
+from typing import Optional, Dict, Any
 
 logger = logging.getLogger("api.services.base")
-
-# Database Configuration (Used for S3 credential refresh as requested by user to keep in-db)
-DB_DIR = Path(os.getenv("DB_DIR", "/app/data"))
-DB_PATH = DB_DIR / "demo_config.db"
 
 DATAFABRIC_SERVICES = [
     {"port": 8443, "description": "REST API", "protocol": "https"},
@@ -23,6 +16,7 @@ DATAFABRIC_SERVICES = [
     {"port": 8082, "description": "Kafka REST API", "protocol": "https"},
 ]
 
+
 class BaseDataFabricService:
     def __init__(self, profile: Dict[str, Any]):
         self.profile = profile
@@ -30,7 +24,7 @@ class BaseDataFabricService:
         self.username = profile.get("username")
         self.password = profile.get("password")
         self.timeout = 10
-        
+
         # Setup requests session
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -40,7 +34,7 @@ class BaseDataFabricService:
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("https://", adapter)
-        
+
         if self.username and self.password:
             self.session.auth = HTTPBasicAuth(self.username, self.password)
 
@@ -76,8 +70,14 @@ class BaseDataFabricService:
 
         url = f"https://{self.cluster_host}:{port}/"
         try:
-            auth = HTTPBasicAuth(self.username, self.password) if self.username and self.password else None
-            response = self.session.get(url, auth=auth, timeout=self.timeout, verify=False)
+            auth = (
+                HTTPBasicAuth(self.username, self.password)
+                if self.username and self.password
+                else None
+            )
+            response = self.session.get(
+                url, auth=auth, timeout=self.timeout, verify=False
+            )
             service_result["status_code"] = response.status_code
             service_result["https_available"] = True
 
@@ -89,6 +89,6 @@ class BaseDataFabricService:
                 service_result["auth_status"] = "not_required"
         except Exception as e:
             service_result["error"] = f"HTTPS test error: {str(e)}"
-            service_result["https_available"] = True # Port was open
+            service_result["https_available"] = True  # Port was open
 
         return service_result

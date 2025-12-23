@@ -45,7 +45,6 @@ export interface ReadinessScore {
 export interface LayerReadiness {
     status: 'ready' | 'missing';
     details: {
-        volume?: boolean;
         bucket?: boolean;
         topic?: boolean;
         table?: boolean;
@@ -54,7 +53,6 @@ export interface LayerReadiness {
 
 export interface DashboardData {
     configured: boolean;
-    volumes: any[];
     topics: any[];
     tables: any[];
     buckets: any[];
@@ -68,7 +66,6 @@ export interface DashboardData {
 
 export interface BootstrapResult {
     status: string;
-    volumes: any[];
     topics: any[];
     tables: any[];
     logs: string[];
@@ -76,7 +73,6 @@ export interface BootstrapResult {
 
 export interface BootstrapStatus {
     bootstrapped: boolean;
-    volumes_created?: number;
     topics_created?: number;
     tables_created?: number;
     bootstrapped_at?: string;
@@ -92,7 +88,7 @@ export interface DemoLog {
 
 export interface ScenarioRequest {
     profile_id: string;
-    scenario_type: 'simulate_ingestion' | 'process_data' | 'curate_data';
+    scenario_type: 'iot_streaming' | 'process_data' | 'curate_data';
 }
 
 export interface ScenarioResult {

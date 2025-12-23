@@ -1,11 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+// import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ConnectionProfile, ConnectionTestResult, ServiceDetail, ReadinessScore } from '../interfaces';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-export default function SettingsPage() {
+export default function AdminPage() {
+  // const queryClient = useQueryClient();
   const [profile, setProfile] = useState<ConnectionProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -15,6 +17,32 @@ export default function SettingsPage() {
   const [saveResult, setSaveResult] = useState<ConnectionTestResult | null>(null);
   const [services, setServices] = useState<ServiceDetail[]>([]);
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
+
+  // Fetch Dashboard Data for Layers and Resources
+  // const { data: dashboardData } = useQuery<DashboardData>({
+  //   queryKey: ['dashboardData'],
+  //   queryFn: async () => {
+  //     const res = await fetch(`${API_BASE}/dashboard/data`);
+  //     if (!res.ok) throw new Error('Failed to fetch dashboard data');
+  //     return res.json();
+  //   },
+  //   refetchInterval: 10000,
+  // });
+
+  // const scenarioMutation = useMutation({
+  //   mutationFn: async ({ type, label }: { type: string, label: string }) => {
+  //     const res = await fetch(`${API_BASE}/profile/scenarios/run`, {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ profile_id: 'default', scenario_type: type })
+  //     });
+  //     if (!res.ok) throw new Error('Scenario failed');
+  //     return res.json() as Promise<ScenarioResult>;
+  //   },
+  //   onSuccess: () => {
+  //     queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+  //   },
+  // });
 
   // SQLite Viewer state
   const [tables, setTables] = useState<string[]>([]);
@@ -83,7 +111,7 @@ export default function SettingsPage() {
       await fetchProfile();
       setSaveResult({ status: 'success', message: 'Profile saved successfully' });
     } catch (err) {
-      setSaveResult({ status: 'error', message: 'Error saving profile' });
+      setSaveResult({ status: 'error', message: `Error saving profile ${err}` });
     } finally {
       setSaving(false);
     }
@@ -134,7 +162,7 @@ export default function SettingsPage() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">Loading Settings...</div>;
+    return <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">Loading Admin...</div>;
   }
 
   if (!profile) {
@@ -142,7 +170,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
+
       {/* Connection Profile Form */}
       <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
         <h2 className="text-xl font-semibold mb-4">Connection Profile</h2>

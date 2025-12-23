@@ -9,6 +9,12 @@ ENV UV_COMPILE_BYTECODE=1
 # Copy requirements first for better caching
 COPY requirements.txt .
 
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies using uv
 # --system is used because we are in a container and don't need a venv
 RUN uv pip install --system -r requirements.txt

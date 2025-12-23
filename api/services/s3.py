@@ -2,18 +2,26 @@ import logging
 import json
 import time
 import sqlite3
-from typing import Dict, Any, List, Optional
-from services.base import BaseDataFabricService, DB_PATH
+from typing import Dict, Any, List
+from services.base import BaseDataFabricService
+from services.db import DB_PATH
+
+try:
+    import state
+except ImportError:
+    state = None
+
 
 logger = logging.getLogger("api.services.s3")
 
 try:
     import boto3
-    from botocore.exceptions import ClientError
     from botocore.config import Config
+
     BOTO3_AVAILABLE = True
 except ImportError:
     BOTO3_AVAILABLE = False
+
 
 class S3Service(BaseDataFabricService):
     def __init__(self, profile: Dict[str, Any]):
@@ -47,22 +55,30 @@ class S3Service(BaseDataFabricService):
         try:
             response = self.generate_s3_credentials()
             if response.get("status") == "OK" and response.get("data"):
-                data = response.get("data")[0]
+                data = response.get("data", [])[0]
                 new_creds = {
                     "accessKey": data.get("accesskey"),
                     "secretKey": data.get("secretkey"),
-                    "expiryTime": data.get("expiryTime")
+                    "expiryTime": data.get("expiryTime"),
                 }
                 creds_json = json.dumps(new_creds)
                 self.s3_access_key = new_creds["accessKey"]
                 self.s3_secret_key = new_creds["secretKey"]
                 self.profile["s3_credentials"] = creds_json
-                
+
                 # Persist to DB (User requested to keep this logic for demos)
                 conn = sqlite3.connect(str(DB_PATH))
-                conn.execute("UPDATE connection_profile SET s3_credentials = ? WHERE id = 'default'", (creds_json,))
+                conn.execute(
+                    "UPDATE connection_profile SET s3_credentials = ? WHERE id = 'default'",
+                    (creds_json,),
+                )
                 conn.commit()
                 conn.close()
+
+                # Invalidate global cache so main API picks up new creds
+                if state:
+                    state.invalidate_profile_cache()
+
         except Exception as e:
             logger.error(f"Error refreshing S3 credentials: {e}")
 
@@ -82,12 +98,17 @@ class S3Service(BaseDataFabricService):
 
     def list_buckets(self) -> List[Dict[str, Any]]:
         self.ensure_valid_credentials()
-        if not BOTO3_AVAILABLE: return []
+        if not BOTO3_AVAILABLE:
+            return []
         try:
-            s3 = boto3.client("s3", endpoint_url=f"https://{self.cluster_host}:9000",
-                             aws_access_key_id=self.s3_access_key or self.username,
-                             aws_secret_access_key=self.s3_secret_key or self.password,
-                             verify=False, config=Config(signature_version="s3v4"))
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{self.cluster_host}:9000",
+                aws_access_key_id=self.s3_access_key or self.username,
+                aws_secret_access_key=self.s3_secret_key or self.password,
+                verify=False,
+                config=Config(signature_version="s3v4"),
+            )
             response = s3.list_buckets()
             return [{"name": b["Name"]} for b in response.get("Buckets", [])]
         except Exception as e:
@@ -96,33 +117,139 @@ class S3Service(BaseDataFabricService):
 
     def create_bucket(self, bucket_name: str) -> Dict[str, Any]:
         self.ensure_valid_credentials()
-        if not BOTO3_AVAILABLE: return {"status": "error", "message": "boto3 not available"}
+        if not BOTO3_AVAILABLE:
+            return {"status": "error", "message": "boto3 not available"}
         try:
-            s3 = boto3.client("s3", endpoint_url=f"https://{self.cluster_host}:9000",
-                             aws_access_key_id=self.s3_access_key or self.username,
-                             aws_secret_access_key=self.s3_secret_key or self.password,
-                             verify=False, config=Config(signature_version="s3v4"))
-            
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{self.cluster_host}:9000",
+                aws_access_key_id=self.s3_access_key or self.username,
+                aws_secret_access_key=self.s3_secret_key or self.password,
+                verify=False,
+                config=Config(signature_version="s3v4"),
+            )
+
             # Idempotent check
             existing = [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
             if bucket_name in existing:
-                return {"status": "success", "outcome": "skipped", "message": f"Bucket {bucket_name} exists"}
+                return {
+                    "status": "success",
+                    "outcome": "skipped",
+                    "message": f"Bucket {bucket_name} exists",
+                }
 
             s3.create_bucket(Bucket=bucket_name)
-            return {"status": "success", "outcome": "created", "message": f"Bucket {bucket_name} created"}
+            return {
+                "status": "success",
+                "outcome": "created",
+                "message": f"Bucket {bucket_name} created",
+            }
         except Exception as e:
             logger.error(f"Error creating bucket: {e}")
             return {"status": "error", "message": str(e)}
 
     def test_s3(self) -> Dict[str, Any]:
         self.ensure_valid_credentials()
-        if not BOTO3_AVAILABLE: return {"status": "error", "message": "boto3 not available"}
+        if not BOTO3_AVAILABLE:
+            return {"status": "error", "message": "boto3 not available"}
         try:
-            s3 = boto3.client("s3", endpoint_url=f"https://{self.cluster_host}:9000",
-                             aws_access_key_id=self.s3_access_key or self.username,
-                             aws_secret_access_key=self.s3_secret_key or self.password,
-                             verify=False, config=Config(signature_version="s3v4", connect_timeout=5))
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{self.cluster_host}:9000",
+                aws_access_key_id=self.s3_access_key or self.username,
+                aws_secret_access_key=self.s3_secret_key or self.password,
+                verify=False,
+                config=Config(signature_version="s3v4", connect_timeout=5),
+            )
             s3.list_buckets()
             return {"status": "success", "message": "S3 API accessible"}
         except Exception as e:
-            return {"status": "auth_failed" if "403" in str(e) else "error", "message": f"S3 error: {str(e)}"}
+            return {
+                "status": "auth_failed" if "403" in str(e) else "error",
+                "message": f"S3 error: {str(e)}",
+            }
+
+    def list_objects(self, bucket_name: str) -> List[Dict[str, Any]]:
+        self.ensure_valid_credentials()
+        if not BOTO3_AVAILABLE:
+            return []
+        try:
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{self.cluster_host}:9000",
+                aws_access_key_id=self.s3_access_key or self.username,
+                aws_secret_access_key=self.s3_secret_key or self.password,
+                verify=False,
+                config=Config(signature_version="s3v4"),
+            )
+            response = s3.list_objects_v2(Bucket=bucket_name)
+            return [
+                {
+                    "key": obj["Key"],
+                    "size": obj["Size"],
+                    "last_modified": (
+                        obj["LastModified"].isoformat()
+                        if hasattr(obj["LastModified"], "isoformat")
+                        else str(obj["LastModified"])
+                    ),
+                }
+                for obj in response.get("Contents", [])
+            ]
+        except Exception as e:
+            logger.error(f"Error listing objects in bucket {bucket_name}: {e}")
+            return []
+
+    def read_object(self, bucket_name: str, object_key: str) -> str:
+        self.ensure_valid_credentials()
+        if not BOTO3_AVAILABLE:
+            return ""
+        try:
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{self.cluster_host}:9000",
+                aws_access_key_id=self.s3_access_key or self.username,
+                aws_secret_access_key=self.s3_secret_key or self.password,
+                verify=False,
+                config=Config(signature_version="s3v4"),
+            )
+
+            # Download CSV from S3
+            response = s3.get_object(Bucket=bucket_name, Key=object_key)
+            content = response["Body"].read().decode("utf-8")
+            return content
+        except Exception as e:
+            logger.error(
+                f"Error reading object {object_key} in bucket {bucket_name}: {e}"
+            )
+            return ""
+
+    def put_object(self, bucket_name: str, object_key: str, content: bytes) -> bool:
+        self.ensure_valid_credentials()
+        if not BOTO3_AVAILABLE:
+            return ""
+        try:
+            s3 = boto3.client(
+                "s3",
+                endpoint_url=f"https://{self.cluster_host}:9000",
+                aws_access_key_id=self.s3_access_key or self.username,
+                aws_secret_access_key=self.s3_secret_key or self.password,
+                verify=False,
+                config=Config(signature_version="s3v4"),
+            )
+
+            if s3.put_object(
+                Bucket=bucket_name,
+                Key=object_key,
+                Body=content,
+                ContentType="text/csv",
+            ):
+                return True
+
+            logger.warning(f"S3 put failed for some reason!")
+            return False
+
+        except Exception as e:
+            logger.error(
+                f"Error putting object {object_key} in bucket {bucket_name}: {e}"
+            )
+            return False

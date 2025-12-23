@@ -10,3 +10,4 @@ urllib3
 sqlalchemy
 pyarrow
 pyiceberg[s3fs]
+pandas

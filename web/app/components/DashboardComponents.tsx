@@ -1,8 +1,11 @@
 'use client';
 
-export function StatusItem({ label, active }: { label: string, active?: boolean }) {
+export function StatusItem({ label, active, onClick }: { label: string, active?: boolean, onClick?: () => void }) {
     return (
-        <div className="flex items-center justify-between">
+        <div
+            className={`flex items-center justify-between ${onClick && active ? 'cursor-pointer hover:bg-white/5 -mx-1 px-1 rounded transition-colors' : ''}`}
+            onClick={active ? onClick : undefined}
+        >
             <span className={active ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
             <span className={active ? 'text-emerald-500' : 'text-destructive'}>
                 {active ? '●' : '○'}
@@ -10,6 +13,7 @@ export function StatusItem({ label, active }: { label: string, active?: boolean 
         </div>
     );
 }
+
 
 export function ResourceStat({ label, count }: { label: string, count: number }) {
     return (

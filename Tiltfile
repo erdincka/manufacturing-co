@@ -6,7 +6,7 @@ k8s_yaml('api/deployment.yaml')
 
 # WebApp (Next.js)
 docker_build(
-    'localhost:5000/web',
+    'web',
     './web',
     dockerfile='./web/Dockerfile',
     live_update=[
@@ -35,7 +35,7 @@ k8s_resource(
 
 # API (FastAPI)
 docker_build(
-    'localhost:5000/api',
+    'api',
     './api',
     dockerfile='./api/Dockerfile',
     live_update=[

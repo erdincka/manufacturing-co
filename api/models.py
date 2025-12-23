@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
+
 class ConnectionProfile(BaseModel):
     id: Optional[str] = None
     name: str
@@ -11,10 +12,12 @@ class ConnectionProfile(BaseModel):
     updated_at: Optional[str] = None
     s3_credentials: Optional[str] = None
 
+
 class ConnectionTestResult(BaseModel):
     status: str  # success, error, auth_failed, tls_error
     message: str
     details: Optional[Dict[str, Any]] = None
+
 
 class ServiceStatus(BaseModel):
     service_name: str
@@ -23,18 +26,21 @@ class ServiceStatus(BaseModel):
     required: bool
     fix_guidance: Optional[str] = None
 
+
 class BootstrapRequest(BaseModel):
     profile_id: str
 
+
 class BootstrapResult(BaseModel):
     status: str
-    volumes: List[Dict[str, Any]]
     topics: List[Dict[str, Any]]
     tables: List[Dict[str, Any]]
     logs: List[str]
 
+
 class ScenarioRequest(BaseModel):
-    scenario_type: str  # simulate_ingestion, process_data, curate_data
+    scenario_type: str  # iot_streaming, process_data, curate_data
+
 
 class ScenarioResult(BaseModel):
     status: str

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: api
-          image: localhost:5000/api:latest
+          image: api:latest
           ports:
             - containerPort: 8000
           env:
@@ -52,10 +52,15 @@ spec:
           volumeMounts:
             - name: api-config
               mountPath: /app/config
+            - name: api-data
+              mountPath: /app/data
       volumes:
         - name: api-config
           configMap:
             name: api-config
+        - name: api-data
+          persistentVolumeClaim:
+            claimName: api-data-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -118,3 +123,14 @@ metadata:
 type: Opaque
 data:
   jwt-secret: U3VwZXJTZWNyZXRLZXlIZXJlCg==
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: api-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
