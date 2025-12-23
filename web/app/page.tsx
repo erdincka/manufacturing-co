@@ -315,7 +315,7 @@ export default function Dashboard() {
                                     <div className="bg-card border border-border rounded-2xl p-6 shadow-sm flex flex-col">
                                         <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
                                             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                                            Bronze Ingestion
+                                            Ingestion
                                         </h4>
                                         <div className="mb-6">
                                             <ProcessingStatus
@@ -380,11 +380,15 @@ export default function Dashboard() {
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-end">
                                             <span className="text-[10px] text-muted-foreground">Active Topics</span>
-                                            <span className="text-xs font-bold font-mono">1</span>
+                                            <span className="text-xs font-bold font-mono">TODO</span>
+                                        </div>
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[10px] text-muted-foreground">Buckets</span>
+                                            <span className="text-xs font-bold font-mono">TODO</span>
                                         </div>
                                         <div className="flex justify-between items-end">
                                             <span className="text-[10px] text-muted-foreground">Iceberg Catalogs</span>
-                                            <span className="text-xs font-bold font-mono">1</span>
+                                            <span className="text-xs font-bold font-mono">TODO</span>
                                         </div>
                                     </div>
                                 </div>

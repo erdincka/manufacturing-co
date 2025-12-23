@@ -169,10 +169,18 @@ class IcebergService(BaseDataFabricService):
             except NoSuchTableError:
                 pass
 
+            # Determine warehouse bucket based on table name (Medallion architecture)
+            if "cleansed" in table_identifier:
+                bucket = "silver-processed"
+            elif "kpis" in table_identifier:
+                bucket = "gold-curated"
+            else:
+                bucket = "gold-curated"
+
             self.catalog.create_table(
                 identifier=f"{ns}.{table_name}",
                 schema=iceberg_schema,
-                location=f"s3://gold-curated/iceberg/{ns}/{table_name}/",
+                location=f"s3://{bucket}/iceberg/{ns}/{table_name}/",
             )
 
             logger.info(f"Table {ns}.{table_name} created")
@@ -285,11 +293,17 @@ class IcebergService(BaseDataFabricService):
             # Ensure timestamp columns are actually datetime objects if they exist
             # Note: Iceberg uses microsecond precision (us), but pandas defaults to nanoseconds (ns)
             if "timestamp" in df.columns:
-                df["timestamp"] = pd.to_datetime(df["timestamp"]).dt.as_unit("us")
+                df["timestamp"] = pd.to_datetime(
+                    df["timestamp"], format="ISO8601"
+                ).dt.as_unit("us")
             if "window_start" in df.columns:
-                df["window_start"] = pd.to_datetime(df["window_start"]).dt.as_unit("us")
+                df["window_start"] = pd.to_datetime(
+                    df["window_start"], format="ISO8601"
+                ).dt.as_unit("us")
             if "window_end" in df.columns:
-                df["window_end"] = pd.to_datetime(df["window_end"]).dt.as_unit("us")
+                df["window_end"] = pd.to_datetime(
+                    df["window_end"], format="ISO8601"
+                ).dt.as_unit("us")
 
             # Convert to PyArrow Table
             arrow_table = pa.Table.from_pandas(df)

@@ -36,26 +36,26 @@ def validate_message(idx: int, message: dict) -> bool:
         valid = False
         logger.warning(f"Message[{idx}] invalid timestamp (not ISO 8601): {ts!r}")
 
-    # 3. Validate temperature: float between 60 and 95 inclusive
+    # 3. Validate temperature: float between 20 and 95 inclusive
     temp = message["temperature"]
     try:
         temp_val = float(temp)
     except (TypeError, ValueError):
         valid = False
         logger.warning(f"Message[{idx}] temperature must be float-like, got {temp!r}")
-    if not (60.0 <= temp_val <= 95.0):
+    if not (20.0 <= temp_val <= 95.0):
         valid = False
-        logger.warning(f"Message[{idx}] temperature out of range [60, 95]: {temp_val}")
+        logger.warning(f"Message[{idx}] temperature out of range [20, 95]: {temp_val}")
 
-    # 4. Validate vibration: float, must be <= 4.8
+    # 4. Validate vibration: float, must be <= 4.95
     vib = message["vibration"]
     try:
         vib_val = float(vib)
     except (TypeError, ValueError):
         valid = False
         logger.warning(f"Message[{idx}] vibration must be float-like, got {vib!r}")
-    if vib_val > 4.8:
+    if vib_val > 4.95:
         valid = False
-        logger.warning(f"Message[{idx}] vibration above limit 4.8: {vib_val}")
+        logger.warning(f"Message[{idx}] vibration above limit 4.95: {vib_val}")
 
     return valid

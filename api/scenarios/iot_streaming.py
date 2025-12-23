@@ -61,8 +61,10 @@ def iot_streaming_scenario(
     consumed_messages = []
     try:
         topic_name = "manufacturing.telemetry.raw"
-        consumed_messages = connector.kafka.list_messages(
-            topic_name, limit=100, commit=True
+        consumed_messages = connector.kafka.consume_messages(
+            topic_name,
+            group_id="manufacturing-consumer-group",
+            commit_async=False,
         )
         logs.append(f"✓ Retrieved {len(consumed_messages)} events from {topic_name}")
 
