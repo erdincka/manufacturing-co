@@ -68,17 +68,17 @@ export function Header() {
                 </ul>
                 <div className="hidden md:block">
                     {!isConfigured ? (
-                        <Link href="/admin" className="flex items-center space-x-2 px-3 py-1.5 bg-red-500/10 text-red-500 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors shadow-sm">
+                        <Link href="/admin" className="flex items-center space-x-2 px-3 py-1.5 bg-red-500/10 text-red-500 rounded-lg hover:bg-red-500/20 transition-colors shadow-sm">
                             <span className="text-[10px] font-bold uppercase tracking-wider">System Offline</span>
-                            <span>❌</span>
+                            <span className="animate-pulse">❌</span>
                         </Link>
                     ) : !isReady ? (
-                        <div className="flex items-center space-x-2 px-3 py-1.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-lg shadow-sm">
+                        <div className="flex items-center space-x-2 px-3 py-1.5 text-amber-500 rounded-lg shadow-sm">
                             <span className="text-[10px] font-bold uppercase tracking-wider">Resources Missing</span>
                             <span className="animate-pulse">⚠️</span>
                         </div>
                     ) : (
-                        <div className="flex items-center space-x-2 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-lg shadow-sm">
+                        <div className="flex items-center space-x-2 px-3 py-1.5 text-emerald-500 rounded-lg shadow-sm">
                             <span className="text-[10px] font-bold uppercase tracking-wider">System Ready</span>
                             <span>✅</span>
                         </div>

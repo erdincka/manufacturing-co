@@ -7,9 +7,6 @@ export function StatusItem({ label, active, onClick }: { label: string, active?:
             onClick={active ? onClick : undefined}
         >
             <span className={active ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
-            <span className={active ? 'text-emerald-500' : 'text-destructive'}>
-                {active ? '●' : '○'}
-            </span>
         </div>
     );
 }

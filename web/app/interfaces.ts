@@ -12,7 +12,7 @@ export interface ConnectionProfile {
 export interface ConnectionTestResult {
     status: string;
     message: string;
-    details?: any;
+    details?: unknown;
 }
 
 export interface ServiceDetail {
@@ -51,11 +51,27 @@ export interface LayerReadiness {
     };
 }
 
+export interface Topic {
+    name: string;
+    partitions: number;
+    replication?: number;
+}
+
+export interface Table {
+    name: string;
+    namespace: string;
+    schema?: string;
+}
+
+export interface Bucket {
+    name: string;
+}
+
 export interface DashboardData {
     configured: boolean;
-    topics: any[];
-    tables: any[];
-    buckets: any[];
+    topics: Topic[];
+    tables: Table[];
+    buckets: Bucket[];
     readiness?: {
         bronze: LayerReadiness;
         silver: LayerReadiness;
@@ -66,8 +82,8 @@ export interface DashboardData {
 
 export interface BootstrapResult {
     status: string;
-    topics: any[];
-    tables: any[];
+    topics: Topic[];
+    tables: Table[];
     logs: string[];
 }
 
@@ -76,14 +92,6 @@ export interface BootstrapStatus {
     topics_created?: number;
     tables_created?: number;
     bootstrapped_at?: string;
-}
-
-export interface DemoLog {
-    id: string;
-    profile_id: string;
-    log_type: string;
-    message: string;
-    timestamp: string;
 }
 
 export interface ScenarioRequest {
@@ -95,5 +103,63 @@ export interface ScenarioResult {
     status: string;
     message: string;
     logs: string[];
-    data_generated?: any;
+    data_generated?: unknown;
+}
+
+export interface DetailedTopicMetrics {
+    topic: string;
+    total_messages: number;
+    in_queue: number;
+    processed: number;
+    latest_message_timestamp?: string;
+    last_processed_timestamp?: string;
+    lag_seconds: number;
+    processing_rate: number;
+    queue_depth_percent: number;
+    [key: string]: string | number | undefined; // Allow dynamic access for the loop in LayerPanels
+}
+
+export interface TelemetryRecord {
+    device_id: string;
+    temperature: number;
+    timestamp: string;
+    [key: string]: string | number | boolean | null | undefined;
+}
+
+export interface KpiRecord {
+    total_events: number;
+    avg_temp: number;
+    anomaly_count: number;
+    window_start?: string;
+    window_end?: string;
+}
+
+export interface BucketObject {
+    key: string;
+    size: number;
+    last_modified: string;
+}
+
+export interface BucketDetails {
+    object_count: number;
+    total_size: number;
+    objects: BucketObject[];
+}
+
+export interface TopicDetails {
+    messages_count: number;
+    in_queue: number;
+    partitions: number;
+    consumers: number;
+    delay_seconds: number;
+    recent_message: string | object | null;
+}
+
+export interface TableDetails {
+    metrics: {
+        record_count: number;
+        snapshot_count: number;
+        last_updated: string;
+    };
+    data: Record<string, string | number | boolean | null | undefined>[];
 }
