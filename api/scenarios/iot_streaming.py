@@ -67,6 +67,7 @@ def iot_streaming_scenario(
         logs.append(f"✕ Metadata update failed: {str(e)}")
 
     cleansed_records = []
+    invalid_message_count = 0
     # Skip the rest if no messages retrieved
     if len(consumed_messages):
         logs.append("Applying schema validation and data cleansing...")
@@ -89,6 +90,7 @@ def iot_streaming_scenario(
 
     yield {
         "records_processed": len(cleansed_records),
+        "invalidated_count": invalid_message_count,
         "target": "telemetry.cleansed",
     }
 

@@ -47,3 +47,4 @@ class ScenarioResult(BaseModel):
     message: str
     logs: List[str]
     data_generated: Optional[Dict[str, Any]] = None
+    invalidated_count: Optional[int] = 0

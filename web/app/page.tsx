@@ -28,6 +28,7 @@ export default function Dashboard() {
         time: string;
         ingestion: number;
         processed: number;
+        invalidated_count?: number;
         lag: number;
         queueDepth: number;
     }[]>([]);
@@ -102,6 +103,7 @@ export default function Dashboard() {
             time: now,
             ingestion: detailedMetrics.total_messages,
             processed: detailedMetrics.processed,
+            invalidated_count: detailedMetrics.invalidated_count,
             lag: detailedMetrics.lag_seconds,
             queueDepth: detailedMetrics.queue_depth_percent,
         };
@@ -315,7 +317,17 @@ export default function Dashboard() {
                                     )}
                                 </div>
                             )}
-
+                            <div>
+                                <button
+                                    onClick={() => scenarioMutation.mutate({ type: 'iot_streaming', label: 'Ingestion' })}
+                                    disabled={isIngesting || scenarioMutation.isPending}
+                                    className="w-full flex flex-col items-center justify-center p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl hover:bg-amber-500/10 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 group"
+                                >
+                                    <span className="text-2xl mb-1 group-hover:animate-bounce">⚡</span>
+                                    <span className="font-semibold text-sm">Start Real-time Stream</span>
+                                    <span className="text-[10px] text-muted-foreground mt-1">100 msgs / batch</span>
+                                </button>
+                            </div>
                             {/* Layer Specific Details & Controls */}
                             <div className="space-y-6">
                                 <BronzeTopicCharts

@@ -104,6 +104,7 @@ export interface ScenarioResult {
     message: string;
     logs: string[];
     data_generated?: unknown;
+    invalidated_count?: number;
 }
 
 export interface DetailedTopicMetrics {
@@ -111,6 +112,7 @@ export interface DetailedTopicMetrics {
     total_messages: number;
     in_queue: number;
     processed: number;
+    invalidated_count?: number;
     latest_message_timestamp?: string;
     last_processed_timestamp?: string;
     lag_seconds: number;

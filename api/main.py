@@ -785,6 +785,7 @@ def get_detailed_topic_metrics(name: str):
         "total_messages": total_messages,
         "in_queue": in_queue,
         "processed": processed,
+        "invalidated_count": 0,  # Placeholder for real-time metrics if available
         "latest_message_timestamp": latest_msg_time,
         "last_processed_timestamp": last_processed_time,
         "lag_seconds": lag_seconds,
@@ -983,6 +984,7 @@ def run_scenario(request: ScenarioRequest):
     connector = DataFabricConnector(profile)
     logs = []
     data_generated = {}
+    invalidated_count = 0
 
     if request.scenario_type == "iot_streaming":
         # Simulate IoT devices sending data to Kafka (Bronze)
@@ -992,6 +994,8 @@ def run_scenario(request: ScenarioRequest):
         for event in iot_streaming_scenario(connector, logs):
             if isinstance(event, dict):
                 data_generated.update(event)
+                if "invalidated_count" in event:
+                    invalidated_count = event["invalidated_count"]
             else:
                 logs.append(str(event))
 
@@ -1013,4 +1017,5 @@ def run_scenario(request: ScenarioRequest):
         message=f"Scenario {request.scenario_type} completed successfully",
         logs=logs,
         data_generated=data_generated,
+        invalidated_count=int(invalidated_count),
     )

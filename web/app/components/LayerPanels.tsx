@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -122,7 +122,14 @@ export function BronzeTopicCharts({ detailedMetrics, history, formatTime }: Bron
                                         return (
                                             <div key={metricStr} className="flex justify-between text-[10px] font-mono border-b border-border/30 pb-1 last:border-0">
                                                 <span className="text-muted-foreground">{metricStr.replaceAll("_", " ").replace(" timestamp", "").replace(/\b\w/g, (c: string) => c.toUpperCase())}</span>
-                                                <span className="text-foreground">{metricStr.includes('timestamp') ? formatTime(detailedMetrics[metric] as string) : detailedMetrics[metric]}</span>
+                                                <span className="text-foreground">
+                                                    {metricStr.includes('timestamp') ? formatTime(detailedMetrics[metric] as string) : detailedMetrics[metric]}
+                                                    {metricStr === 'processed' && typeof detailedMetrics.invalidated_count === 'number' && detailedMetrics.invalidated_count > 0 && (
+                                                        <span className="text-amber-500 ml-1" title="Invalidated messages">
+                                                            ({detailedMetrics.invalidated_count} invalid)
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </div>
                                         );
                                     })}
@@ -179,7 +186,7 @@ export function SilverTelemetryPanel({ lastProcessedRecords, silverData }: Silve
                             <div className="bg-muted/30 p-3 rounded-xl border border-border/50 h-full">
                                 <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Cleansed Feed (Silver)</p>
                                 <div className="space-y-1">
-                                    {lastProcessedRecords?.slice(0, 8).map((rec, i) => (
+                                    {lastProcessedRecords?.slice(0, 6).map((rec, i) => (
                                         <div key={i} className="flex justify-between text-[9px] font-mono border-b border-border/30 pb-1 last:border-0">
                                             <span className="text-muted-foreground truncate max-w-[80px]">{rec.device_id}</span>
                                             <span className="text-muted-foreground truncate max-w-[109px]">{rec.timestamp}</span>
@@ -187,6 +194,7 @@ export function SilverTelemetryPanel({ lastProcessedRecords, silverData }: Silve
                                         </div>
                                     ))}
                                 </div>
+                                <code>{JSON.stringify(lastProcessedRecords?.length, null, 2)}</code>
                             </div>
                         </div>
                     </div>
