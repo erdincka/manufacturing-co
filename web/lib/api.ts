@@ -43,6 +43,13 @@ export const api = {
             body: JSON.stringify({ profile_id: 'default', scenario_type: scenarioType })
         }).then(handleResponse<ScenarioResult>),
 
+    proxyLLMChat: (baseUrl: string, apiToken: string, payload: unknown): Promise<any> =>
+        fetch(`${API_BASE}/llm/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base_url: baseUrl, api_token: apiToken, payload })
+        }).then(handleResponse<any>),
+
     getResourceDetails: async (type: 'Topics' | 'Tables' | 'Buckets', name: string): Promise<TopicDetails | TableDetails | BucketDetails> => {
         let url = "";
         if (type === 'Buckets') url = `${API_BASE}/buckets/${name}/objects`;

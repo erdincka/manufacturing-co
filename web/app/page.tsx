@@ -15,6 +15,7 @@ import {
 import { PipelineFlowDiagram } from './components/PipelineFlowDiagram';
 import { BronzeTopicCharts, SilverTelemetryPanel, GoldKpiPanel } from './components/LayerPanels';
 import { ResourceDetailsModal } from './components/ResourceDetailsModal';
+import { ChatPanel } from './components/ChatPanel';
 import { api } from '../lib/api';
 
 export default function Dashboard() {
@@ -284,7 +285,7 @@ export default function Dashboard() {
                                 ].map((scenario) => (
                                     <button
                                         key={scenario.id}
-                                        onClick={() => setActiveScenario(scenario.id as any)}
+                                        onClick={() => setActiveScenario(scenario.id as 'iot_processing' | 'future_scenario')}
                                         className={`flex items-center gap-2 pb-4 text-sm font-medium transition-all relative ${activeScenario === scenario.id
                                             ? 'text-indigo-500'
                                             : 'text-muted-foreground hover:text-foreground'
@@ -370,6 +371,14 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Chat to your data using LLM */}
+                            <ChatPanel
+                                dashboardData={dashboardData}
+                                detailedMetrics={detailedMetrics}
+                                lastProcessedRecords={lastProcessedRecords}
+                                lastGoldRecords={lastGoldRecords}
+                            />
 
                             {/* Integrated Real-time Feed */}
                             <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm flex flex-col h-[480px]">

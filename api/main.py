@@ -512,7 +512,7 @@ def get_readiness_score():
 
 # --- S3 Key Generation ---
 @app.get("/profile/s3credentials")
-def generate_s3_credentials() -> str:
+def generate_s3_credentials() -> None:
     """Generate a temprorary S3 key."""
     profile = get_profile_from_db()
     if not profile or not profile.get("cluster_host"):
@@ -1019,3 +1019,46 @@ def run_scenario(request: ScenarioRequest):
         data_generated=data_generated,
         invalidated_count=int(invalidated_count),
     )
+
+
+@app.post("/llm/chat")
+async def proxy_llm_chat(request_data: Dict[str, Any]):
+    """Proxy LLM chat requests to bypass CORS issues."""
+    base_url = request_data.get("base_url")
+    api_token = request_data.get("api_token")
+    payload = request_data.get("payload")
+
+    logger.debug(f"Initiating LLM request: {base_url}")
+
+    if not base_url or not payload:
+        raise HTTPException(status_code=400, detail="Missing base_url or payload")
+
+    import requests
+
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    if api_token:
+        headers["Authorization"] = f"Bearer {api_token}"
+
+    try:
+        response = requests.post(
+            f"{base_url.rstrip('/')}/chat/completions",
+            json=payload,
+            headers=headers,
+            timeout=60,
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"LLM Proxy error: {e}")
+        status_code = (
+            e.response.status_code if hasattr(e, "response") and e.response else 500
+        )
+        error_detail = (
+            e.response.json()
+            if hasattr(e, "response") and e.response and e.response.content
+            else {"error": {"message": str(e)}}
+        )
+        raise HTTPException(status_code=status_code, detail=error_detail)

@@ -165,3 +165,18 @@ export interface TableDetails {
     };
     data: Record<string, string | number | boolean | null | undefined>[];
 }
+
+export interface LLMConfig {
+    baseUrl: string;
+    apiToken: string;
+    model: string;
+}
+
+export interface ChatMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    debugInfo?: {
+        request: unknown;
+        response: unknown;
+    };
+}
