@@ -1,0 +1,136 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: backend
+          ports:
+            - containerPort: 8000
+          env:
+            - name: NODE_ENV
+              value: "development"
+            - name: PORT
+              value: "8000"
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: jwt-secret
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: backend-config
+              mountPath: /app/config
+            - name: backend-data
+              mountPath: /app/data
+      volumes:
+        - name: backend-config
+          configMap:
+            name: backend-config
+        - name: backend-data
+          persistentVolumeClaim:
+            claimName: backend-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 80
+      targetPort: 8000
+  type: ClusterIP
+---
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  app.config.json: |
+    {
+      "appName": "backend",
+      "version": "1.0.0",
+      "logging": {
+        "level": "info",
+        "format": "json"
+      },
+      "server": {
+        "port": 8000,
+        "host": "0.0.0.0"
+      },
+      "database": {
+        "connectionTimeout": 5000,
+        "idleTimeout": 30000
+      },
+      "cache": {
+        "ttl": 3600,
+        "maxSize": 1000
+      },
+      "security": {
+        "jwt": {
+          "secret": "jwt-secret",
+          "expiresIn": "24h"
+        }
+      }
+    }
+  env.config.js: |
+    module.exports = {
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      PORT: process.env.PORT || 8000,
+      JWT_SECRET: process.env.JWT_SECRET || 'jwt-secret',
+      LOG_LEVEL: process.env.LOG_LEVEL || 'info'
+    }
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backend-secret
+type: Opaque
+data:
+  jwt-secret: ""
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-data-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

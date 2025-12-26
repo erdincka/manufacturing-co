@@ -6,7 +6,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from typing import Optional, Dict, Any
 
-logger = logging.getLogger("api.services.base")
+logger = logging.getLogger("backend.services.base")
 
 DATAFABRIC_SERVICES = [
     {"port": 8443, "description": "REST API", "protocol": "https"},

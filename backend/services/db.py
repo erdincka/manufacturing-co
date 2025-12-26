@@ -9,7 +9,7 @@ DB_DIR = Path(os.getenv("DB_DIR", "/app/data"))
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "demo_config.db"
 
-logger = logging.getLogger("api")
+logger = logging.getLogger("backend")
 
 
 def get_db_connection():

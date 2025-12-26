@@ -6,7 +6,7 @@ from services.kafka import KafkaService
 from services.s3 import S3Service
 from services.iceberg import IcebergService
 
-logger = logging.getLogger("api.connector")
+logger = logging.getLogger("backend.connector")
 
 
 class DataFabricConnector:

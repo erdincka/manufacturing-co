@@ -5,7 +5,7 @@ import time
 from typing import List, Dict, Any, Optional
 from services.base import BaseDataFabricService
 
-logger = logging.getLogger("api.services.kafka")
+logger = logging.getLogger("backend.services.kafka")
 
 try:
     from kafka import KafkaAdminClient, KafkaProducer, KafkaConsumer, TopicPartition

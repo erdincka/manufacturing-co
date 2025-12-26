@@ -74,7 +74,7 @@ for uvicorn_logger_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
     uv_logger.propagate = True
 
 
-logger = logging.getLogger("api")
+logger = logging.getLogger("backend")
 
 
 # Logger initialized above with imports
@@ -998,7 +998,6 @@ async def proxy_llm_chat(request_data: Dict[str, Any]):
 
     headers = {
         "Content-Type": "application/json",
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
     if api_token:
         headers["Authorization"] = f"Bearer {api_token}"

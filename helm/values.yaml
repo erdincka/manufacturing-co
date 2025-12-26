@@ -1,0 +1,57 @@
+ezua:
+  domainName: "${DOMAIN_NAME}"
+  virtualService:
+    endpoint: "manufacturing-co.${DOMAIN_NAME}"
+    istioGateway: "istio-system/ezaf-gateway"
+  authorizationPolicy:
+    namespace: "istio-system"
+    providerName: "oauth2-proxy"
+    matchLabels:
+      app: "manufacturing-co"
+
+# API Service
+backend:
+  name: backend
+  image:
+    repository: erdincka/manufacturing-co-backend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+  persistence:
+    enabled: true
+    accessMode: ReadWriteOnce
+    size: 1Gi
+  env:
+    DEBUG: "false"
+    NODE_ENV: "production"
+  secrets:
+    jwtSecret: "" # Base64 encoded
+
+# Web Service
+frontend:
+  name: frontend
+  image:
+    repository: erdincka/manufacturing-co-frontend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+  env:
+    NEXT_PUBLIC_API_URL: "" # Will default to api-service if empty

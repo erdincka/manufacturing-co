@@ -1,62 +1,66 @@
 # -*- mode: Python -*-
 
+# Change below for your env
+allow_k8s_contexts('zbook')
+default_registry('localhost:5000')
+
 # Load Kubernetes YAML
-k8s_yaml('web/deployment.yaml')
-k8s_yaml('api/deployment.yaml')
+k8s_yaml('backend/deployment-dev.yaml')
+k8s_yaml('frontend/deployment-dev.yaml')
 
 # WebApp (Next.js)
 docker_build(
-    'web',
-    './web',
-    dockerfile='./web/Dockerfile',
+    'frontend',
+    './frontend',
+    dockerfile='./frontend/Dockerfile.dev',
     live_update=[
         # Ignore files that shouldn't trigger syncs
-        fall_back_on(['./web/package.json', './web/package-lock.json']),
+        fall_back_on(['./frontend/package.json', './frontend/package-lock.json']),
         
         # Sync source files to container
-        sync('./web', '/app'),
+        sync('./frontend', '/app'),
         
         # Run npm install only when package.json changes
         run('npm install', trigger=['package.json']),    
     ],
     # Ignore these directories from triggering builds
-    ignore=['./web/node_modules', './web/.next']
+    ignore=['./frontend/node_modules', './frontend/.next']
 )
 
 k8s_resource(
-    'web',
+    'frontend',
     port_forwards='3000:3000',
-    labels=['web'],
+    labels=['frontend'],
     # Disable health checks for faster dev iteration
     resource_deps=[],
     auto_init=True,
     trigger_mode=TRIGGER_MODE_AUTO,
 )
 
-# API (FastAPI)
+# Backend (FastAPI)
 docker_build(
-    'api',
-    './api',
-    dockerfile='./api/Dockerfile',
+    'backend',
+    './backend',
+    dockerfile='./backend/Dockerfile.dev',
     live_update=[
-        sync('./api', '/app'),
-        run('pip install -r requirements.txt', trigger='./api/requirements.txt'),
+        sync('./backend', '/app'),
+        run('uv pip install -r requirements.txt', trigger='./backend/requirements.txt'),
     ]
 )
 
 k8s_resource(
-    'api',
+    'backend',
     port_forwards='8000:8000',
-    labels=['api'],
+    labels=['backend'],
 )
 
 print("""
 ╔══════════════════════════════════════════════════════════╗
 ║                                                          ║
-║      HPE Data Fabric Manufacturing Demo - Ready         ║
+║      HPE Data Fabric Manufacturing Demo - Ready          ║
 ║                                                          ║
 ║  Frontend:      http://localhost:3000                    ║
-║  API:           http://localhost:8000                    ║
+║  Backend:       http://localhost:8000                    ║
 ║                                                          ║
 ║  Run: tilt up                                            ║
 ║                                                          ║

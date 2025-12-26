@@ -17,7 +17,7 @@ from pyiceberg.types import (
 )
 from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 
-logger = logging.getLogger("api.services.iceberg")
+logger = logging.getLogger("backend.services.iceberg")
 
 
 DEFAULT_BUCKET = "bronze-bucket"

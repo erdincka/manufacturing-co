@@ -12,7 +12,7 @@ except ImportError:
     state = None
 
 
-logger = logging.getLogger("api.services.s3")
+logger = logging.getLogger("backendi.services.s3")
 
 try:
     import boto3

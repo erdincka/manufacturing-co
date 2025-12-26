@@ -1,52 +1,40 @@
-# HPE Data Fabric Manufacturing Demo
+# Manufacturing Co Demo
 
-This demo showcases a modern **Medallion Architecture** (Bronze, Silver, Gold layers) for manufacturing telemetry data, powered by **HPE Data Fabric**.
+This project consists of a Python API and a Next.js Frontend for demonstrating HPE Data Fabric capabilities.
 
-## Overview
+## Production Readiness
 
-The application simulates IoT telemetry from a manufacturing floor, processing it through various stages of refinement using HPE Data Fabric's unified data services:
+The codebase has been cleaned and containerized for production:
 
-1.  **Bronze (Raw)**: IoT telemetry ingested into **HPE Data Fabric Event Data Streams** (Kafka-compatible).
-2.  **Silver (Processed)**: Cleansed and validated data stored in **Apache Iceberg** tables on **HPE Data Fabric Object Store**.
-3.  **Gold (Curated)**: Aggregated KPIs (Key Performance Indicators) for business dashboards, also stored in Iceberg tables.
+- **API**: Python 3.11 with `uv` for dependency management, running as non-root.
+- **Web**: Next.js 15 with standalone output for minimal image size, running as non-root.
+- **Helm**: A complete Helm chart is provided in `helm/manufacturing-co`.
 
-## Key Features & HPE Data Fabric Capabilities
+## Local Development (with Tilt)
 
-### 1. Unified Data Services
-This demo utilizes four core services of HPE Data Fabric seamlessly:
--   **Volumes**: POSIX-compliant storage for system data and database state.
--   **Event Data Streams (Streams)**: Distributed, durable messaging for real-time telemetry ingestion.
--   **Object Store (S3)**: S3-compatible object storage used as the underlying storage for Apache Iceberg tables.
--   **Iceberg Native Support**: High-performance open table format management via PyIceberg, storing data directly on the Data Fabric Object Store.
+```bash
+tilt up
+```
 
-### 2. Medallion Architecture Flow
--   **Ingestion (Bronze)**: Simulates hardware sensors (CNC machines, robots) sending temperature and vibration data to a Kafka topic.
--   **Processing (Silver)**: A processing job consumes raw events from the stream, applies schema validation, and commits the data to an Iceberg table.
--   **Curation (Gold)**: Aggregates silver-layer data into hourly windowed KPIs like average temperature and anomaly counts.
+## Production Deployment (with Helm)
 
-### 3. Security & Connectivity
--   **Automated Credential Management**: Demonstrates automatic generation and rotation of temporary S3 credentials via the Data Fabric REST API.
--   **Self-Healing Connections**: The API monitors service availability and handles transient connectivity issues with intelligent retries.
+1. **Build and Push Images**:
+   Build the images and push them to your registry.
+   ```bash
+   docker buildx build --platform linux/amd64 -t your-registry/backend:latest --push ./backend
+   docker buildx build --platform linux/amd64 -t your-registry/frontend:latest --push ./frontend
+   ```
 
-## Getting Started
+2. **Configure values.yaml**:
+   Update `helm/manufacturing-co/values.yaml` with your values.
 
-### Prerequisites
--   A running HPE Data Fabric cluster.
--   Access to the cluster REST API (port 8443) and Kafka/S3 ports.
+3. **Install the Chart**:
+   ```bash
+   helm install manufacturing-co ./helm/manufacturing-co
+   ```
 
-### Running the Demo
-1.  **Configure**: Enter your Cluster Host and Credentials on the Settings page.
-2.  **Bootstrap**: Use the "Bootstrap Demo" button to automatically create all necessary Data Fabric resources (Volumes, Topics, Buckets, Tables).
-3.  **Simulate**:
-    -   Run **Simulate Ingestion** to generate raw events.
-    -   Run **Process Data** to move data from Bronze to Silver.
-    -   Run **Curate Data** to generate Gold-layer KPIs.
-4.  **Explore**: Use the dashboard to browse files in volumes, messages in Kafka topics, and data in Iceberg tables.
+## Project Structure
 
----
-
-## Technical Architecture
-
--   **Frontend**: Next.js (React) with a premium, responsive dashboard UI.
--   **Backend**: FastAPI (Python) implementing the Data Fabric SDK logic.
--   **Storage**: SQLite for local demo state, HPE Data Fabric for mission-critical data.
+- `backend/`: Python FastAPI service.
+- `frontend/`: Next.js frontend application.
+- `helm/`: Kubernetes deployment configuration.
