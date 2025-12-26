@@ -932,45 +932,6 @@ def get_bootstrap_status():
         conn.close()
 
 
-# --- Debug Endpoints ---
-
-
-@app.get("/debug/tables")
-def get_sqlite_tables():
-    """Get list of tables in SQLite database."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = [row[0] for row in cursor.fetchall()]
-        return {"tables": tables}
-    finally:
-        conn.close()
-
-
-@app.get("/debug/table/{table_name}")
-def get_sqlite_table_content(table_name: str, limit: int = 100):
-    """Get content of a specific SQLite table."""
-    # Allow-list tables for security
-    allowed_tables = [
-        "connection_profile",
-        "service_status",
-        "bootstrap_state",
-    ]
-    if table_name not in allowed_tables:
-        raise HTTPException(status_code=400, detail="Table not allowed")
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        # Use simple string formatting since table name is validated against allow-list
-        cursor.execute(f"SELECT * FROM {table_name} LIMIT ?", (limit,))
-        rows = cursor.fetchall()
-        return [dict(row) for row in rows]
-    finally:
-        conn.close()
-
-
 # --- Scenario Runner Endpoints ---
 
 
