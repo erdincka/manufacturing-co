@@ -17,6 +17,8 @@ spec:
         {{- include "manufacturing-co.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: backend
     spec:
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag | default .Chart.AppVersion }}"

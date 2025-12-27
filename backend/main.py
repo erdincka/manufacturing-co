@@ -388,16 +388,16 @@ def discover_services():
         service_statuses = []
         fix_guidance_map = {
             "REST API": "Ensure Data Fabric cluster is running and accessible. Check network connectivity and security settings.",
-            "HBase REST": "Enable HBase REST API service on the cluster.",
+            # "HBase REST": "Enable HBase REST API service on the cluster.",
             "Object Store": "Enable Object Store service and configure S3-compatible endpoint.",
-            "Database JSON REST API": "Enable Database JSON REST API service (OJAI).",
-            "Hive Server2": "Ensure Hive Server2 is running and accessible.",
-            "Hive Metastore": "Ensure Hive Metastore service is running.",
+            # "Database JSON REST API": "Enable Database JSON REST API service (OJAI).",
+            # "Hive Server2": "Ensure Hive Server2 is running and accessible.",
+            # "Hive Metastore": "Ensure Hive Metastore service is running.",
             "Kafka REST API": "Enable the Kafka REST API gateway for the cluster.",
-            "Kafka Connect REST API": "Enable Kafka Connect REST API service.",
-            "NFS": "Configure NFS gateway service on Data Fabric cluster.",
-            "NiFi": "Ensure NiFi service is running and accessible.",
-            "OJAI REST API": "Enable OJAI REST API service (Database JSON).",
+            # "Kafka Connect REST API": "Enable Kafka Connect REST API service.",
+            # "NFS": "Configure NFS gateway service on Data Fabric cluster.",
+            # "NiFi": "Ensure NiFi service is running and accessible.",
+            # "OJAI REST API": "Enable OJAI REST API service (Database JSON).",
         }
 
         for service in result.get("services", []):
@@ -848,7 +848,7 @@ def bootstrap_demo(background_tasks: BackgroundTasks):
 
     # Create Iceberg tables
     table_schemas = {
-        f"{BRONZE_BUCKET}.telemetry.cleansed": {
+        f"{SILVER_BUCKET}.telemetry.cleansed": {
             "type": "struct",
             "schema-id": 1,
             "fields": [

@@ -94,25 +94,36 @@ def iot_streaming_scenario(
         "target": "telemetry.cleansed",
     }
 
-    logs.append("Querying 'manufacturing.telemetry.cleansed' for KPI calculation...")
-    # TODO: fix the logic
-    time.sleep(1)
-    logs.append("Calculating hourly aggregates (Avg Temp, Vibration anomalies)...")
-    time.sleep(2)
+    logs.append("Querying 'telemetry.cleansed' for KPI calculation...")
 
-    kpi_records = [
-        {
-            "window_start": datetime.now(timezone.utc).isoformat(),
-            "window_end": datetime.now(timezone.utc).isoformat(),
-            "total_events": 1000 + random.randint(0, 500),
-            "avg_temp": 24.5 + random.random(),
-            "anomaly_count": random.randint(0, 5),
-        }
-    ]
+    # Actual KPI calculation from cleansed records
+    if cleansed_records:
+        logs.append("Calculating hourly aggregates (Avg Temp, Vibration anomalies)...")
 
-    logs.append("Updating 'manufacturing.kpis' table...")
-    connector.iceberg.append_data("manufacturing.kpis", kpi_records)
-    time.sleep(1)
+        total_events = len(cleansed_records)
+        avg_temp = sum(r["temperature"] for r in cleansed_records) / total_events
+        anomaly_count = sum(1 for r in cleansed_records if r["status"] == "WARNING")
 
-    logs.append("✓ KPI dashboard view refreshed")
-    yield {"kpis_generated": 1, "target": "manufacturing.kpis"}
+        # Determine time window
+        timestamps = [datetime.fromisoformat(r["timestamp"]) for r in cleansed_records]
+        window_start = min(timestamps).isoformat()
+        window_end = max(timestamps).isoformat()
+
+        kpi_records = [
+            {
+                "window_start": window_start,
+                "window_end": window_end,
+                "total_events": total_events,
+                "avg_temp": round(avg_temp, 2),
+                "anomaly_count": anomaly_count,
+            }
+        ]
+
+        logs.append(
+            f"Updating 'manufacturing.kpis' table with results: Avg Temp={round(avg_temp, 2)}, Anomaly Count={anomaly_count}..."
+        )
+        connector.iceberg.append_data("manufacturing.kpis", kpi_records)
+        logs.append("✓ KPI dashboard view refreshed")
+        yield {"kpis_generated": 1, "target": "manufacturing.kpis"}
+    else:
+        logs.append("No cleansed records available to calculate KPIs.")

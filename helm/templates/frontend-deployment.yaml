@@ -27,7 +27,7 @@ spec:
               protocol: TCP
           env:
             - name: NEXT_PUBLIC_API_URL
-              value: {{ .Values.frontend.env.NEXT_PUBLIC_API_URL | default (printf "http://%s-backend:%d/api" (include "manufacturing-co.fullname" .) (int .Values.backend.service.port)) | quote }}
+              value: "/api"
           livenessProbe:
             httpGet:
               path: /api/health

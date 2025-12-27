@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ConnectionProfile, ConnectionTestResult, ServiceDetail, ReadinessScore } from '../interfaces';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Force relative path for production
+const API_BASE = '/api';
 
 export default function AdminPage() {
   // const queryClient = useQueryClient();
@@ -18,68 +19,9 @@ export default function AdminPage() {
   const [services, setServices] = useState<ServiceDetail[]>([]);
   const [readiness, setReadiness] = useState<ReadinessScore | null>(null);
 
-  // Fetch Dashboard Data for Layers and Resources
-  // const { data: dashboardData } = useQuery<DashboardData>({
-  //   queryKey: ['dashboardData'],
-  //   queryFn: async () => {
-  //     const res = await fetch(`${API_BASE}/dashboard/data`);
-  //     if (!res.ok) throw new Error('Failed to fetch dashboard data');
-  //     return res.json();
-  //   },
-  //   refetchInterval: 10000,
-  // });
-
-  // const scenarioMutation = useMutation({
-  //   mutationFn: async ({ type, label }: { type: string, label: string }) => {
-  //     const res = await fetch(`${API_BASE}/profile/scenarios/run`, {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ profile_id: 'default', scenario_type: type })
-  //     });
-  //     if (!res.ok) throw new Error('Scenario failed');
-  //     return res.json() as Promise<ScenarioResult>;
-  //   },
-  //   onSuccess: () => {
-  //     queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
-  //   },
-  // });
-
-  // SQLite Viewer state
-  const [tables, setTables] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [tableContent, setTableContent] = useState<Record<string, any>[]>([]);
-
   useEffect(() => {
     fetchProfile();
-    fetchTables();
   }, []);
-
-  const fetchTables = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/debug/tables`);
-      if (res.ok) {
-        const data = await res.json();
-        setTables(data.tables || []);
-      }
-    } catch (error) {
-      console.error('Failed to fetch tables', error);
-    }
-  };
-
-  const loadTableContent = async (tableName: string) => {
-    setSelectedTable(tableName);
-    setTableContent([]);
-    try {
-      const res = await fetch(`${API_BASE}/debug/table/${tableName}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTableContent(data);
-      }
-    } catch (error) {
-      console.error(`Failed to fetch content for table ${tableName}`, error);
-    }
-  };
 
   const fetchProfile = async () => {
     try {
@@ -333,7 +275,6 @@ export default function AdminPage() {
           </div>
         )
       }
-
     </div >
   );
 }

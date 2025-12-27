@@ -3,13 +3,17 @@ from pathlib import Path
 import os
 import sqlite3
 
+logger = logging.getLogger("backend")
+
 # --- Database Configuration (SQLite for demo config) ---
 # Use /app/data in container, ./data locally
 DB_DIR = Path(os.getenv("DB_DIR", "/app/data"))
-DB_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DB_DIR / "demo_config.db"
+try:
+    DB_DIR.mkdir(parents=True, exist_ok=True)
+except Exception as e:
+    logger.warning(f"Could not create DB_DIR {DB_DIR}: {e}")
 
-logger = logging.getLogger("backend")
+DB_PATH = DB_DIR / "demo_config.db"
 
 
 def get_db_connection():

@@ -10,7 +10,8 @@ import {
     TableDetails
 } from '../app/interfaces';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Force relative path for production
+const API_BASE = '/api';
 
 async function handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {

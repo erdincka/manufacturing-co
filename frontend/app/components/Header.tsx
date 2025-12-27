@@ -3,8 +3,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ThemeToggle } from './ThemeToggle';
 import { useQuery } from '@tanstack/react-query';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { api } from '@/lib/api';
 
 export function Header() {
     const pathname = usePathname();
@@ -12,9 +11,8 @@ export function Header() {
     const { data: dashboardData } = useQuery({
         queryKey: ['dashboardData'],
         queryFn: async () => {
-            const res = await fetch(`${API_BASE}/dashboard/data`);
-            if (!res.ok) throw new Error('Failed to fetch dashboard data');
-            return res.json();
+            const res = await api.getDashboardData()
+            return res;
         },
         refetchInterval: 10000,
     });

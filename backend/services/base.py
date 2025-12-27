@@ -10,9 +10,9 @@ logger = logging.getLogger("backend.services.base")
 
 DATAFABRIC_SERVICES = [
     {"port": 8443, "description": "REST API", "protocol": "https"},
-    {"port": 8080, "description": "HBase REST", "protocol": "https"},
+    # {"port": 8080, "description": "HBase REST", "protocol": "https"},
     {"port": 9000, "description": "Object Store", "protocol": "https"},
-    {"port": 8243, "description": "Database JSON REST API", "protocol": "https"},
+    # {"port": 8243, "description": "Database JSON REST API", "protocol": "https"},
     {"port": 8082, "description": "Kafka REST API", "protocol": "https"},
 ]
 

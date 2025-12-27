@@ -6,6 +6,9 @@ venv/
 env/
 .git
 .gitignore
+.dockerignore
 Dockerfile
+Dockerfile.dev
+deployment-dev.yaml
 README.md
 .DS_Store
