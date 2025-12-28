@@ -34,6 +34,8 @@ Follow the UI for full configuration:
 
 - Discover Services (check port availability and auth)
 
+![Settings](./images/configure.png)
+
 - Bootstrap resources (if missing app will enforce you to create them):
    
    - Create the S3 buckets and Kafka topics for each layer (bronze, silver and gold)
@@ -46,6 +48,7 @@ Follow the UI for full configuration:
 
 Once app shows "System Ready" on top header, you can navigate and create simulated data ingestion that will generate sample records (100 per run).
 
+![Dashboard](./images/dashboard.png)
 
 ## Local Development (with Tilt)
 
