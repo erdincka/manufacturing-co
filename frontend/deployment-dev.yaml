@@ -25,6 +25,8 @@ spec:
               value: "development"
             - name: PORT
               value: "3000"
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://localhost:8000"
           resources:
             requests:
               memory: "1Gi"

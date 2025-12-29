@@ -201,15 +201,7 @@ export function ResourceDetailsModal({
                         </div>
                     )}
                 </div>
-                <div className="p-6 border-t border-border bg-muted/30 flex justify-between items-center">
-                    {data && onBackToList && (
-                        <button
-                            onClick={onBackToList}
-                            className="text-xs text-indigo-500 hover:underline font-bold uppercase tracking-widest"
-                        >
-                            &larr; Back to List
-                        </button>
-                    )}
+                <div className="p-6 border-t border-border bg-muted/30 flex justify-end items-center">
                     <button
                         onClick={onClose}
                         className="px-6 py-2 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg transition-colors border border-border font-medium"

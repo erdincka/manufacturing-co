@@ -82,19 +82,21 @@ def iot_streaming_scenario(
                 invalid_message_count += 1
 
         logs.append(
-            f"Writing {len(cleansed_records)} cleansed records to 'telemetry.cleansed' and discarding {invalid_message_count} invalid record(s)..."
+            f"Writing {len(cleansed_records)} cleansed records to 'silver-bucket.telemetry.cleansed' and discarding {invalid_message_count} invalid record(s)..."
         )
 
-        connector.iceberg.append_data("telemetry.cleansed", cleansed_records)
+        connector.iceberg.append_data(
+            "silver-bucket.telemetry.cleansed", cleansed_records
+        )
         logs.append("✓ Committed transaction to Iceberg table")
 
     yield {
         "records_processed": len(cleansed_records),
         "invalidated_count": invalid_message_count,
-        "target": "telemetry.cleansed",
+        "target": "silver-bucket.telemetry.cleansed",
     }
 
-    logs.append("Querying 'telemetry.cleansed' for KPI calculation...")
+    logs.append("Querying 'silver-bucket.telemetry.cleansed' for KPI calculation...")
 
     # Actual KPI calculation from cleansed records
     if cleansed_records:
@@ -120,10 +122,10 @@ def iot_streaming_scenario(
         ]
 
         logs.append(
-            f"Updating 'manufacturing.kpis' table with results: Avg Temp={round(avg_temp, 2)}, Anomaly Count={anomaly_count}..."
+            f"Updating 'gold-bucket.manufacturing.kpis' table with results: Avg Temp={round(avg_temp, 2)}, Anomaly Count={anomaly_count}..."
         )
-        connector.iceberg.append_data("manufacturing.kpis", kpi_records)
+        connector.iceberg.append_data("gold-bucket.manufacturing.kpis", kpi_records)
         logs.append("✓ KPI dashboard view refreshed")
-        yield {"kpis_generated": 1, "target": "manufacturing.kpis"}
+        yield {"kpis_generated": 1, "target": "gold-bucket.manufacturing.kpis"}
     else:
         logs.append("No cleansed records available to calculate KPIs.")

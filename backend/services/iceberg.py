@@ -20,9 +20,6 @@ from pyiceberg.exceptions import NamespaceAlreadyExistsError, NoSuchTableError
 logger = logging.getLogger("backend.services.iceberg")
 
 
-DEFAULT_BUCKET = "bronze-bucket"
-
-
 def retry_iceberg(max_retries=3, delay=1):
     def decorator(func):
         import time
@@ -41,7 +38,8 @@ def retry_iceberg(max_retries=3, delay=1):
                         time.sleep(delay * (i + 1))
                         continue
                     raise e
-            raise last_err
+            if last_err:
+                raise last_err
 
         return wrapper
 
@@ -55,8 +53,9 @@ class IcebergService(BaseDataFabricService):
 
     def _init_catalog(self) -> SqlCatalog:
         """Initialize the local SQL catalog."""
-        # Default warehouse path, but we override location per table in create_table
-        warehouse_path = f"s3://{DEFAULT_BUCKET}/iceberg/"
+        # Use a more neutral warehouse path for the catalog itself.
+        # We'll continue to override location per-table during creation.
+        warehouse_path = "s3:///"
 
         # PyIceberg SQL Catalog configuration
         catalog_conf = {
@@ -137,15 +136,23 @@ class IcebergService(BaseDataFabricService):
         """
         Create an Iceberg table using PyIceberg.
         """
+        # If table_identifier is bucket.ns.table, strip the bucket part for the catalog identifier
+        # but keep it for the location.
         parts = table_identifier.split(".")
-        if len(parts) == 2:
+        if len(parts) == 3:
+            # bucket.ns.table
+            bucket_in_id, ns, table_name = parts
+            bucket = bucket_in_id  # Override bucket with the one from identifier
+        elif len(parts) == 2:
             ns, table_name = parts
         else:
             logger.error(f"Invalid table identifier: {table_identifier}")
             return {
                 "status": "error",
-                "message": "Invalid table identifier. Use namespace.table",
+                "message": "Invalid table identifier. Use namespace.table or bucket.namespace.table",
             }
+
+        catalog_id = f"{ns}.{table_name}"
 
         # Ensure namespace exists
         try:
@@ -164,32 +171,56 @@ class IcebergService(BaseDataFabricService):
 
             # Check if table exists
             try:
-                self.catalog.load_table(f"{ns}.{table_name}")
-                logger.info(f"Table {ns}.{table_name} already exists")
-                return {
-                    "status": "success",
-                    "outcome": "skipped",
-                    "message": f"Table {ns}.{table_name} exists",
-                }
+                table = self.catalog.load_table(catalog_id)
+                logger.info(f"Table {catalog_id} already exists at {table.location()}")
+
+                # Fix: If table exists but points to wrong bucket, drop and recreate
+                # This is important for fixing existing misconfigured environments
+                expected_location_prefix = f"s3://{bucket}/iceberg/{ns}/{table_name}"
+                if not table.location().startswith(expected_location_prefix):
+                    logger.warning(
+                        f"Table {catalog_id} location {table.location()} does not match expected path {expected_location_prefix}. Dropping and recreating..."
+                    )
+                    self.catalog.drop_table(catalog_id)
+                else:
+                    return {
+                        "status": "success",
+                        "outcome": "skipped",
+                        "message": f"Table {catalog_id} exists in correct bucket",
+                    }
             except NoSuchTableError:
                 pass
+            except Exception as e:
+                # If loading fails (e.g. metadata file missing), we might need to drop and recreate
+                if "FileNotFoundError" in str(e) or "Path does not exist" in str(e):
+                    logger.warning(
+                        f"Table {catalog_id} found in catalog but metadata is missing. Dropping to allow recreation: {e}"
+                    )
+                    try:
+                        self.catalog.drop_table(catalog_id)
+                    except:
+                        pass
+                else:
+                    raise e
 
             # Explicitly set the location to ensure it goes to the correct bucket
             # PyIceberg SQL catalog uses the warehouse path by default, but we override it here.
             table_location = f"s3://{bucket}/iceberg/{ns}/{table_name}/"
-            logger.info(f"Creating table {table_identifier} at {table_location}")
+            logger.info(
+                f"Creating table {catalog_id} at {table_location} (bucket: {bucket})"
+            )
 
             self.catalog.create_table(
-                identifier=f"{ns}.{table_name}",
+                identifier=catalog_id,
                 schema=iceberg_schema,
                 location=table_location,
             )
 
-            logger.info(f"Table {ns}.{table_name} created")
+            logger.info(f"Table {catalog_id} created")
             return {
                 "status": "success",
                 "outcome": "created",
-                "message": f"Table {ns}.{table_name} created",
+                "message": f"Table {catalog_id} created",
             }
 
         except Exception as e:
@@ -260,18 +291,44 @@ class IcebergService(BaseDataFabricService):
             NestedField(field_id=1, name="id", field_type=StringType(), required=True)
         )
 
+    def _strip_bucket_from_identifier(self, table_identifier: str) -> str:
+        """Helper to strip bucket name from identifier if present (e.g. silver-bucket.ns.table -> ns.table)"""
+        parts = table_identifier.split(".")
+        if len(parts) == 3:
+            return f"{parts[1]}.{parts[2]}"
+        return table_identifier
+
     @retry_iceberg()
     def get_table_data(
-        self, table_identifier: str, limit: int = 50
+        self, table_identifier: str, limit: int = 500
     ) -> List[Dict[str, Any]]:
-        """Scan table and return records."""
+        """Scan all records from the table and return them."""
         try:
-            table = self.catalog.load_table(table_identifier)
-            # Scan with limit
-            scan = table.scan(limit=limit)
-            df = scan.to_pandas()
-            # Convert pandas DF to list of dicts
-            return df.to_dict(orient="records")
+            catalog_id = self._strip_bucket_from_identifier(table_identifier)
+
+            # Re-initialize catalog to ensure we have the latest metadata from S3
+            self.catalog = self._init_catalog()
+            table = self.catalog.load_table(catalog_id)
+
+            df = table.scan().to_pandas()
+
+            if df.empty:
+                logger.debug(f"Table {catalog_id} is empty")
+                return []
+
+            # Sort by timestamp/window_start if present to ensure consistent view
+            if "timestamp" in df.columns:
+                df = df.sort_values(by="timestamp", ascending=False)
+            elif "window_start" in df.columns:
+                df = df.sort_values(by="window_start", ascending=False)
+
+            # Return all records (or up to limit if specified)
+            return (
+                df.head(limit).to_dict(orient="records")
+                if limit
+                else df.to_dict(orient="records")
+            )  # pyright: ignore[reportReturnType]
+
         except NoSuchTableError:
             logger.error(f"Table {table_identifier} not found")
             return []
@@ -289,7 +346,9 @@ class IcebergService(BaseDataFabricService):
             if not records:
                 return {"status": "success", "message": "No records to append"}
 
-            table = self.catalog.load_table(table_identifier)
+            # Strip bucket name from identifier for catalog lookup
+            catalog_id = self._strip_bucket_from_identifier(table_identifier)
+            table = self.catalog.load_table(catalog_id)
             df = pd.DataFrame(records)
 
             # Ensure timestamp columns are actually datetime objects if they exist
@@ -338,12 +397,31 @@ class IcebergService(BaseDataFabricService):
             "last_updated": None,
         }
         try:
-            table = self.catalog.load_table(table_identifier)
+            # Strip bucket name from identifier for catalog lookup
+            catalog_id = self._strip_bucket_from_identifier(table_identifier)
+            table = self.catalog.load_table(catalog_id)
             # Record count (from latest snapshot properties if available, else scan)
             # PyIceberg doesn't expose total records easily without scan for now in some versions
             # But we can get snapshot info
             metrics["snapshot_count"] = len(table.history())
             current = table.current_snapshot()
+
+            # For demo reliability, if record_count is 0 but snapshots exist,
+            # or if we just want the most accurate number, we perform a count()
+            try:
+                # This ensures we get the actual number of records currently in the table
+                df = table.scan().to_pandas()
+                metrics["record_count"] = len(df)
+            except Exception as e:
+                logger.warning(
+                    f"Could not get precise record count via scan for {table_identifier}: {e}"
+                )
+                # Fallback to summary if scan fails
+                if current and current.summary:
+                    metrics["record_count"] = int(
+                        current.summary.get("total-records", 0)
+                    )
+
             if current:
                 metrics["current_snapshot_id"] = current.snapshot_id
                 import datetime
@@ -351,8 +429,6 @@ class IcebergService(BaseDataFabricService):
                 metrics["last_updated"] = datetime.datetime.fromtimestamp(
                     current.timestamp_ms / 1000.0
                 ).isoformat()
-                # Get record count from summary if present
-                metrics["record_count"] = int(current.summary.get("total-records", 0))
 
             return metrics
         except Exception as e:

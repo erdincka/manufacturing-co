@@ -255,7 +255,11 @@ def update_profile(profile: ConnectionProfile):
                 # Parse response format: {'status': 'OK', 'data': [{'accesskey': '...', 'secretkey': '...'}]}
                 if s3_creds and s3_creds.get("status") == "OK" and s3_creds.get("data"):
                     try:
-                        data = s3_creds.get("data")[0]
+                        data = s3_creds.get(
+                            "data"
+                        )[  # pyright: ignore[reportOptionalSubscript]
+                            0
+                        ]  # pyright: ignore[reportOptionalSubscript]
                         # Normalize keys for consistency
                         stored_creds = {
                             "accessKey": data.get("accesskey"),
@@ -490,13 +494,13 @@ def get_readiness_score():
         s
         for s in services
         if (isinstance(s, dict) and s.get("required"))
-        or (hasattr(s, "required") and s.required)
+        or (hasattr(s, "required") and s.required)  # type: ignore
     ]
     available_required = sum(
         1
         for s in required_services
         if (isinstance(s, dict) and s.get("status") == "available")
-        or (hasattr(s, "status") and s.status == "available")
+        or (hasattr(s, "status") and s.status == "available")  # type: ignore
     )
     score = (
         (available_required / len(required_services) * 100) if required_services else 0
@@ -592,31 +596,33 @@ def get_dashboard_data():
             },
             "silver": {
                 "bucket": SILVER_BUCKET,
-                "table": "telemetry.cleansed",
+                "table": f"{SILVER_BUCKET}.telemetry.cleansed",
             },
             "gold": {
                 "bucket": GOLD_BUCKET,
-                "table": "manufacturing.kpis",
+                "table": f"{GOLD_BUCKET}.manufacturing.kpis",
             },
         }
 
         # Collect all expected resource names for filtering
         expected_buckets = {
-            s.get("bucket") for s in medallion_expectations.values() if "bucket" in s
+            s.get("bucket", "")
+            for s in medallion_expectations.values()
+            if "bucket" in s
         }
         expected_topics = {
-            s.get("topic") for s in medallion_expectations.values() if "topic" in s
+            s.get("topic", "") for s in medallion_expectations.values() if "topic" in s
         }
         expected_tables = {
-            s.get("table") for s in medallion_expectations.values() if "table" in s
+            s.get("table", "") for s in medallion_expectations.values() if "table" in s
         }
 
         # Helper to check existence and filter
         bucket_names = (
             [b.get("name") for b in buckets] if isinstance(buckets, list) else []
         )
-        topic_names = [t.get("name") for t in topics]
-        table_names = [t.get("name") for t in tables]
+        topic_names = [t.get("name", "") for t in topics]
+        table_names = [t.get("name", "") for t in tables]
 
         readiness = {}
         for layer, specs in medallion_expectations.items():
@@ -638,7 +644,7 @@ def get_dashboard_data():
             if "table" in specs:
                 target = specs["table"]
                 exists = any(
-                    t == target or t.endswith("." + target) for t in table_names
+                    target == t or target.endswith("." + t) for t in table_names
                 )
                 details["table"] = exists
                 if not exists:
@@ -715,24 +721,40 @@ def get_topic_queue(name: str, limit: int = 50):
     return connector.kafka.list_unprocessed_messages(name, limit=limit)
 
 
-@app.get("/tables/{name}/data")
+def _resolve_table_identifier(name: str) -> str:
+    """Resolve simple table name to bucket-qualified identifier if needed."""
+    if "." in name and any(
+        name.startswith(b) for b in ["bronze-bucket", "silver-bucket", "gold-bucket"]
+    ):
+        return name
+    # Default mappings for known demo tables
+    if "cleansed" in name:
+        return f"silver-bucket.telemetry.cleansed"
+    if "kpis" in name:
+        return f"gold-bucket.manufacturing.kpis"
+    return name
+
+
+@app.get("/tables/{name:path}/data")
 def get_table_data_endpoint(name: str):
     profile = get_profile_from_db()
     if not profile:
         raise HTTPException(status_code=400, detail="Profile not configured")
     connector = DataFabricConnector(profile)
-    data = connector.get_table_data(name)
-    metrics = connector.iceberg.get_table_metrics(name)
+    identifier = _resolve_table_identifier(name)
+    data = connector.get_table_data(identifier)
+    metrics = connector.iceberg.get_table_metrics(identifier)
     return {"data": data, "metrics": metrics}
 
 
-@app.get("/tables/{name}/metrics")
+@app.get("/tables/{name:path}/metrics")
 def get_table_metrics_endpoint(name: str):
     profile = get_profile_from_db()
     if not profile:
         raise HTTPException(status_code=400, detail="Profile not configured")
     connector = DataFabricConnector(profile)
-    return connector.iceberg.get_table_metrics(name)
+    identifier = _resolve_table_identifier(name)
+    return connector.iceberg.get_table_metrics(identifier)
 
 
 @app.get("/topics/{name}/detailed-metrics")

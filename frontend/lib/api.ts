@@ -10,8 +10,8 @@ import {
     TableDetails
 } from '../app/interfaces';
 
-// Force relative path for production
-const API_BASE = '/api';
+// Use environment variable for API URL in development, default to /api for production
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : '/api';
 
 async function handleResponse<T>(res: Response): Promise<T> {
     if (!res.ok) {

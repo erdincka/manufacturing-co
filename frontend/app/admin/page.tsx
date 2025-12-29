@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 // import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ConnectionProfile, ConnectionTestResult, ServiceDetail, ReadinessScore } from '../interfaces';
 
-// Force relative path for production
-const API_BASE = '/api';
+// Use environment variable for API URL in development, default to /api for production
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : '/api';
 
 export default function AdminPage() {
   // const queryClient = useQueryClient();
