@@ -1,8 +1,7 @@
 import logging
-import time
 import random
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import List
 from uuid import uuid4
 from connector import DataFabricConnector
 from utils import validate_message
@@ -82,18 +81,16 @@ def iot_streaming_scenario(
                 invalid_message_count += 1
 
         logs.append(
-            f"Writing {len(cleansed_records)} cleansed records to 'silver-bucket.telemetry.cleansed' and discarding {invalid_message_count} invalid record(s)..."
+            f"Writing {len(cleansed_records)} cleansed records to 'telemetry.cleansed' and discarding {invalid_message_count} invalid record(s)..."
         )
 
-        connector.iceberg.append_data(
-            "silver-bucket.telemetry.cleansed", cleansed_records
-        )
+        connector.iceberg.append_data("telemetry.cleansed", cleansed_records)
         logs.append("✓ Committed transaction to Iceberg table")
 
     yield {
         "records_processed": len(cleansed_records),
         "invalidated_count": invalid_message_count,
-        "target": "silver-bucket.telemetry.cleansed",
+        "target": ".telemetry.cleansed",
     }
 
     logs.append("Querying 'silver-bucket.telemetry.cleansed' for KPI calculation...")

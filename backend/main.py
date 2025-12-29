@@ -724,14 +724,14 @@ def get_topic_queue(name: str, limit: int = 50):
 def _resolve_table_identifier(name: str) -> str:
     """Resolve simple table name to bucket-qualified identifier if needed."""
     if "." in name and any(
-        name.startswith(b) for b in ["bronze-bucket", "silver-bucket", "gold-bucket"]
+        name.startswith(b) for b in [BRONZE_BUCKET, SILVER_BUCKET, GOLD_BUCKET]
     ):
         return name
     # Default mappings for known demo tables
     if "cleansed" in name:
-        return f"silver-bucket.telemetry.cleansed"
+        return f"{SILVER_BUCKET}.telemetry.cleansed"
     if "kpis" in name:
-        return f"gold-bucket.manufacturing.kpis"
+        return f"{GOLD_BUCKET}.manufacturing.kpis"
     return name
 
 
