@@ -1,6 +1,19 @@
 # Manufacturing Co Demo
 
-This project consists of a Python API and a Next.js Frontend for demonstrating HPE Data Fabric capabilities.
+This project uses HPE Data Fabric to demonstrate multi-format data lakehouse to build a Medallion architecture data flow for a fictional manufacturing company. Demo is built to be deployed on HPE Private Cloud AI platform and integrate with it's AI model serving endpoints via OpenAI API compatible chat interface, and utilizes the external HPE Data Fabric platform to create and use;
+
+- `Kafka Topics` for streaming real-time data as part of the bronze layer (raw data), 
+
+- `Iceberg Tables (stored in Silver bucket)` to keep track of cleaned up data as part of the silver layer (cleaned/processed data),
+
+- `Iceberg Tables (stored in Gold bucket)` to consolidate curated data sets as part of the gold layer.
+
+App enables user to process the entire data pipeline with a single click, which initiates the pipeline by publishing randomly generated 100 IOT device messages into the bronze layer topic, which in turn triggers processing and curating the data into higher layers in the architecture. 
+Even though the app is not showing the entire data processing, it's outputs are visible in a "dashboard-like" interface similar to a real-time monitoring system for a production line.
+
+Finally, integrated Chatbot engine send queries along with the context built in the app, including mocked IOT sensor data and processed/curated silver and gold layer data (respectively) to the AI model as part of the chat message. This demonstrates the value of integrated AI engine that would help with analyzing and recommending on active datasets totally within the organisation boundries, without sending any message, data or device information to external AI model providers.
+
+A simple demonstration can be seen in the ![demo video](./demo.mp4).
 
 ## Production Readiness
 
