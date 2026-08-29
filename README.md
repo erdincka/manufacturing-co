@@ -1,93 +1,141 @@
-# Manufacturing Co Demo
+# Manufacturing Co — a medallion lakehouse with the AI kept inside
 
-This project uses HPE Data Fabric to demonstrate multi-format data lakehouse to build a Medallion architecture data flow for a fictional manufacturing company. Demo is built to be deployed on HPE Private Cloud AI platform and integrate with it's AI model serving endpoints via OpenAI API compatible chat interface, and utilizes the external HPE Data Fabric platform to create and use;
+Factory telemetry is exactly the kind of data most organisations cannot paste into a
+public AI service: it describes how the plant runs, who supplies it, and what is going
+wrong. **Manufacturing Co** is a working demo of the alternative — a complete
+bronze → silver → gold data pipeline for a fictional manufacturer, built on
+[HPE Data Fabric](https://www.hpe.com/us/en/hpe-ezmeral-data-fabric.html), with an
+assistant that answers questions about the live data while never leaving the
+organisation's own boundary. One click runs the whole pipeline: 100 simulated IoT
+readings are published to a stream, cleaned into an Iceberg table, aggregated into
+KPIs, and rendered on a dashboard — and the same curated data is what the chat
+assistant reasons over. It is aimed at data and infrastructure architects weighing up
+a lakehouse design, and at anyone who needs to show that "AI on our own data" can mean
+literally that.
 
-- `Kafka Topics` for streaming real-time data as part of the bronze layer (raw data), 
+![The dashboard: medallion layers, live ingestion charts, and the assistant summarising the current data](images/demo.gif)
 
-- `Iceberg Tables (stored in Silver bucket)` to keep track of cleaned up data as part of the silver layer (cleaned/processed data),
+<table>
+<tr>
+<td width="50%"><img src="images/screenshot-dashboard.png" alt="Bronze, silver and gold layer cards above live ingestion and device-temperature charts"></td>
+<td width="50%"><img src="images/configure.png" alt="The admin page testing a Data Fabric connection and discovering its services"></td>
+</tr>
+<tr>
+<td><em>Each layer reports its own table, bucket and readiness; the feed on the right narrates every step as it runs.</em></td>
+<td><em>Admin: test the connection, save the profile, discover which services are actually reachable.</em></td>
+</tr>
+</table>
 
-- `Iceberg Tables (stored in Gold bucket)` to consolidate curated data sets as part of the gold layer.
+## The pipeline
 
-App enables user to process the entire data pipeline with a single click, which initiates the pipeline by publishing randomly generated 100 IOT device messages into the bronze layer topic, which in turn triggers processing and curating the data into higher layers in the architecture. 
-Even though the app is not showing the entire data processing, it's outputs are visible in a "dashboard-like" interface similar to a real-time monitoring system for a production line.
+```mermaid
+flowchart LR
+    iot["Simulated IoT devices<br/><i>100 readings per run</i>"]
 
-Finally, integrated Chatbot engine send queries along with the context built in the app, including mocked IOT sensor data and processed/curated silver and gold layer data (respectively) to the AI model as part of the chat message. This demonstrates the value of integrated AI engine that would help with analyzing and recommending on active datasets totally within the organisation boundries, without sending any message, data or device information to external AI model providers.
+    subgraph bronze ["BRONZE — raw"]
+        topic["Kafka topic<br/><code>telemetry.raw</code>"]
+        bb[("bronze-bucket")]
+    end
 
-A simple demonstration can be seen in the ![demo video](./demo.mp4).
+    subgraph silver ["SILVER — cleansed"]
+        st["Iceberg table<br/><code>telemetry.cleansed</code>"]
+        sb[("silver-bucket")]
+    end
 
-## Production Readiness
+    subgraph gold ["GOLD — curated"]
+        gt["Iceberg table<br/><code>manufacturing.kpis</code>"]
+        gb[("gold-bucket")]
+    end
 
-The codebase has been cleaned and containerized for production:
+    dash["Dashboard"]
+    ai["Assistant<br/><i>OpenAI-compatible endpoint</i>"]
 
-- **API**: Python 3.11 with `uv` for dependency management, running as non-root.
-- **Web**: Next.js 15 with standalone output for minimal image size, running as non-root.
-- **Helm**: A complete Helm chart is provided in `helm/manufacturing-co`.
+    iot -->|publish| topic --> bb
+    bb -->|"validate · discard invalid"| st --> sb
+    sb -->|aggregate| gt --> gb
+    bb --> dash
+    sb --> dash
+    gb --> dash
+    dash -->|"question + current data as context"| ai
 
-## Deploy on PCAI
+    classDef b fill:#fef3c7,stroke:#b45309,color:#451a03;
+    classDef s fill:#f1f5f9,stroke:#475569,color:#0f172a;
+    classDef g fill:#fef9c3,stroke:#a16207,color:#422006;
+    class topic,bb b;
+    class st,sb s;
+    class gt,gb g;
+    style bronze fill:#ffffff,stroke:#fcd34d,stroke-width:1px,color:#92400e;
+    style silver fill:#ffffff,stroke:#cbd5e1,stroke-width:1px,color:#334155;
+    style gold fill:#ffffff,stroke:#fde047,stroke-width:1px,color:#854d0e;
+```
 
-Use `Import Framework` wizard to deploy the application.
+Nothing in that path leaves the cluster. The assistant receives the sensor readings and
+the curated silver and gold rows as context in the prompt, and talks to a model endpoint
+you nominate — so the analysis happens where the data already lives.
 
-Use [logo](./manufacturing-co.jpeg) image for the logo, and [helm chart](./manufacturing-co-0.1.0.tgz) file as your package.
+## What you need
 
-Once deployed, you should go to the "Admin" page and configure for your Data Fabric connection.
+- **An HPE Data Fabric cluster** with these services reachable:
 
-Data Fabric should have following services enabled/installed:
+  | Service | Port | Notes |
+  |---|---|---|
+  | REST API | 8443 | Installed by default |
+  | Object store (S3) | 9000 | Installed by default. The app mints short-lived S3 keys through the REST API, so your user needs rights to do that |
+  | Kafka REST API | 8082 | Install the `mapr-kafka` package if it is not already there |
 
-- REST API (port 8443) - installed by default, no need for manual configuration
+- **A model endpoint** speaking the OpenAI chat API, for the assistant.
+- A Kubernetes cluster to run the app itself.
 
-- Object Storage (port 9000) - installed by default, no need for manual configuration (app will create temporary/short-lived s3 access_key and secret_key using REST API to connect, so your configured user should have access to that)
+## Deploy it
 
-- Kafka REST API (port 8082) - Install mapr-kafka package if not already installed.
+On [HPE Private Cloud AI](https://www.hpe.com/us/en/hpe-private-cloud-ai.html), use the
+**Import Framework** wizard with the packaged chart
+[`manufacturing-co-0.1.0.tgz`](./manufacturing-co-0.1.0.tgz) and
+[`manufacturing-co.jpeg`](./manufacturing-co.jpeg) as the logo.
 
-Follow the UI for full configuration:
+Anywhere else, install the chart directly:
 
-- Test Connection (verify auth and enable connection profile)
+```bash
+helm install manufacturing-co ./helm/manufacturing-co \
+  --set ezua.virtualService.endpoint=manufacturing.<YOUR_DOMAIN>
+```
 
-- Save Profile (used by the app through its lifecycle, stored in PVC for persistance)
+### First run
 
-- Discover Services (check port availability and auth)
+Everything else happens on the **Admin** page, in order:
 
-![Settings](./images/configure.png)
+1. **Test Connection** — verifies credentials and enables the connection profile.
+2. **Save Profile** — persisted to a PVC, so it survives restarts.
+3. **Discover Services** — checks each port and its authentication.
+4. **Bootstrap resources** — creates what is missing:
+   - buckets `bronze-bucket`, `silver-bucket`, `gold-bucket`
+   - tables `telemetry.raw`, `telemetry.cleansed`, `manufacturing.kpis`
 
-- Bootstrap resources (if missing app will enforce you to create them):
-   
-   - Create the S3 buckets and Kafka topics for each layer (bronze, silver and gold)
+When the header reads **System Ready**, go to the dashboard and press
+**Start Real-time Stream**. Each run generates 100 records and carries them through
+every layer. Run it as many times as you like.
 
-      - bronze-bucket
-      - silver-bucket
-      - gold-bucket
-
-   - Create the Iceberg tables at each layer (telemetry.raw for bronze, telemetry.cleansed for silver and manufacturing.kpis for gold layer)
-
-Once app shows "System Ready" on top header, you can navigate and create simulated data ingestion that will generate sample records (100 per run).
-
-![Dashboard](./images/dashboard.png)
-
-## Local Development (with Tilt)
+## Development
 
 ```bash
 tilt up
 ```
 
-## Development Deployment (using Helm)
+Or build and push your own images and point the chart at them:
 
-1. **Build and Push Images**:
-   Build the images and push them to your registry.
-   ```bash
-   docker buildx build --platform linux/amd64 -t your-registry/backend:latest --push ./backend
-   docker buildx build --platform linux/amd64 -t your-registry/frontend:latest --push ./frontend
-   ```
+```bash
+docker buildx build --platform linux/amd64 -t <registry>/manufacturing-backend:latest --push ./backend
+docker buildx build --platform linux/amd64 -t <registry>/manufacturing-frontend:latest --push ./frontend
+```
 
-2. **Configure values.yaml**:
-   Update `helm/manufacturing-co/values.yaml` with your values.
+`./redeploy.sh` repackages the chart and reapplies it in one step.
 
-3. **Install the Chart**:
-   ```bash
-   helm install manufacturing-co ./helm/manufacturing-co
-   ```
+## Layout
 
-## Project Structure
+| Path | What |
+|---|---|
+| `backend/` | FastAPI service, Python 3.11, dependencies via `uv`, runs as non-root |
+| `frontend/` | Next.js 15, standalone output, runs as non-root |
+| `helm/` | Chart for both, plus ingress and auth policy |
 
-- `backend/`: Python FastAPI service.
-- `frontend/`: Next.js frontend application.
-- `helm/`: Kubernetes deployment configuration.
+A longer screen recording is in [`demo.mp4`](./demo.mp4).
