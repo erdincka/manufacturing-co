@@ -1,5 +1,7 @@
 # Manufacturing Co — a medallion lakehouse with the AI kept inside
 
+> **Prerequisites** — requires [HPE Data Fabric](https://www.hpe.com/us/en/hpe-ezmeral-data-fabric.html).
+
 Factory telemetry is exactly the kind of data most organisations cannot paste into a
 public AI service: it describes how the plant runs, who supplies it, and what is going
 wrong. **Manufacturing Co** is a working demo of the alternative — a complete
